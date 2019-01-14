@@ -37,41 +37,31 @@ void ADC_INIT(void) {
 /*
  * This Function Configures the ADC for use with the Moisture Sensor and also will begin the conversion for the ADC.
  */
-void ADC_MOISTURE_CTRL(void) {
+void ADC_CTRL(void) {
         ADC12_B_setupSamplingTimer(ADC12_B_BASE,
                                    ADC12_B_CYCLEHOLD_16_CYCLES,
                                    ADC12_B_CYCLEHOLD_16_CYCLES,
                                    ADC12_B_MULTIPLESAMPLESENABLE);
         ADC12_B_configureMemoryParam memParam = {0};
         memParam.memoryBufferControlIndex = ADC12_B_MEMORY_0;
-        memParam.inputSourceSelect = ADC12_B_INPUT_A1; //Whatever the moisture sensor's analog wiring is.
+        memParam.inputSourceSelect = ADC12_B_INPUT_A10; //Whatever the moisture sensor's analog wiring is.
         memParam.refVoltageSourceSelect = ADC12_B_VREFPOS_AVCC_VREFNEG_VSS;
         memParam.endOfSequence = ADC12_B_NOTENDOFSEQUENCE;
         memParam.windowComparatorSelect = ADC12_B_WINDOW_COMPARATOR_DISABLE;
         memParam.differentialModeSelect = ADC12_B_DIFFERENTIAL_MODE_DISABLE;
         ADC12_B_configureMemory(ADC12_B_BASE, &memParam);
-        ADC12_B_clearInterrupt(ADC12_B_BASE, 0, ADC12_B_IFG0);
-        ADC12_B_enableInterrupt(ADC12_B_BASE, ADC12_B_IE0, 0, 0);
-}
 
-/*
- * This Function Configures the ADC for use with the Temperature Sensor and also will begin the conversion for the ADC
- */
-void ADC_TEMP_CTRL(void) {
-        ADC12_B_setupSamplingTimer(ADC12_B_BASE,
-                                   ADC12_B_CYCLEHOLD_16_CYCLES,
-                                   ADC12_B_CYCLEHOLD_16_CYCLES,
-                                   ADC12_B_MULTIPLESAMPLESENABLE);
-        ADC12_B_configureMemoryParam memParam = {0};
-        memParam.memoryBufferControlIndex = ADC12_B_MEMORY_0;
-        memParam.inputSourceSelect = ADC12_B_INPUT_A2; //Whatever the temperature sensor's analog wiring is.
+        ADC12_B_configureMemoryParam memParam1 = {0};
+        memParam.memoryBufferControlIndex = ADC12_B_MEMORY_1;
+        memParam.inputSourceSelect = ADC12_B_INPUT_A11; //Whatever the temperature sensor's analog wiring is.
         memParam.refVoltageSourceSelect = ADC12_B_VREFPOS_AVCC_VREFNEG_VSS;
-        memParam.endOfSequence = ADC12_B_NOTENDOFSEQUENCE;
+        memParam.endOfSequence = ADC12_B_ENDOFSEQUENCE;
         memParam.windowComparatorSelect = ADC12_B_WINDOW_COMPARATOR_DISABLE;
         memParam.differentialModeSelect = ADC12_B_DIFFERENTIAL_MODE_DISABLE;
-        ADC12_B_configureMemory(ADC12_B_BASE, &memParam);
+        ADC12_B_configureMemory(ADC12_B_BASE, &memParam1);
+
         ADC12_B_clearInterrupt(ADC12_B_BASE, 0, ADC12_B_IFG0);
-        ADC12_B_enableInterrupt(ADC12_B_BASE, ADC12_B_IE0, 0, 0);
+        ADC12_B_enableInterrupt(ADC12_B_BASE, ADC12_B_IE0 | ADC12_B_IE1, 0, 0);
 }
 
 /*
@@ -83,13 +73,10 @@ void STATE_CHECK(void) {
                 // Puts the Device to sleep waiting on Interrupts.
                 __bis_SR_register(LPM3_bits + GIE);
                 __no_operation();
-        } else if (STATE == POLLM) {
-                ADC_MOISTURE_CTRL();
-        } else if (STATE == POLLT) {
-                ADC_TEMP_CTRL();
+        } else if (STATE == POLL) {
+                ADC_CTRL();
         } else if (STATE == INIT) {
-                //INIT();
-                STATE = POLLM;
+                //INIT(
         } else if (STATE == RUNNING) {
 
         }
@@ -99,9 +86,7 @@ void main(void) {
         // Sets Frequency to 1MHz low, 1MHz high
         CS_setDCOFreq(CS_DCORSEL_0, CS_DCOFSEL_0);
         // Sets Master Clock (System and CPU clock to 1 MHz)
-        CS_initClockSignal(CS_MCLK,
-                           CS_DCOCLK_SELECT,
-                           CS_CLOCK_DIVIDER_1);
+        CS_initClockSignal(CS_MCLK, CS_DCOCLK_SELECT, CS_CLOCK_DIVIDER_1);
         // Disable Watchdog Timer while Initializing.
         WDT_A_hold(WDT_A_BASE);
         // Call GPIO_INIT before ADC Because GPIO formats for ADC use
