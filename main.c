@@ -7,7 +7,6 @@
 
 // enumeration to define the three different states
 enum currentState {
-    STARTUP,
     STANDBY,
     PANDC,
     RUNNING
@@ -27,14 +26,24 @@ struct moisture {
 
 main()
 {
+/*
+ * TODO
+ * Initialize display and create a function to display a startup
+ * message and ask for TIME:DAY:MONTH and userTemp and userMoisture
+ */
 
 /*
  * The standby state is entered when the device is done watering
  * and is left upon user or timer interrupt
  */
 while (currentState = STANDBY) {
-    return 0
+    /*
+     * TODO
+     * Enter sleep mode and change state when interrupted via timer
+     * or user interrupt
+     */
 }
+
 /*
  * The running state is entered upon interrupt and checks
  * whether or not the system has run recently and if the moisture
@@ -45,6 +54,7 @@ while (currentState = PANDC) {
         currentState = STANDBY;
     }
     /*
+     * TODO
      * ENABLE TEMP/MOISTURE SENSOR AND ADC SAMPLING
      * COLLECT RUNNING AVERAGE HERE OR CALL RUNNING AVERAGE FUNCTION
      * LOAD THE VALUE INTO CURRENT TEMP/CURRENT MOISTURE
