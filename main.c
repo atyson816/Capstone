@@ -42,6 +42,7 @@ void ADC_CTRL(void) {
                                    ADC12_B_CYCLEHOLD_16_CYCLES,
                                    ADC12_B_CYCLEHOLD_16_CYCLES,
                                    ADC12_B_MULTIPLESAMPLESENABLE);
+        // Setting up the Memory Config for the Moisture Sensor
         ADC12_B_configureMemoryParam memParam = {0};
         memParam.memoryBufferControlIndex = ADC12_B_MEMORY_0;
         memParam.inputSourceSelect = ADC12_B_INPUT_A10; //Whatever the moisture sensor's analog wiring is.
@@ -50,7 +51,7 @@ void ADC_CTRL(void) {
         memParam.windowComparatorSelect = ADC12_B_WINDOW_COMPARATOR_DISABLE;
         memParam.differentialModeSelect = ADC12_B_DIFFERENTIAL_MODE_DISABLE;
         ADC12_B_configureMemory(ADC12_B_BASE, &memParam);
-
+        // Setting up the Memory Config for the Temperature Sensor.
         ADC12_B_configureMemoryParam memParam1 = {0};
         memParam.memoryBufferControlIndex = ADC12_B_MEMORY_1;
         memParam.inputSourceSelect = ADC12_B_INPUT_A11; //Whatever the temperature sensor's analog wiring is.
@@ -59,7 +60,7 @@ void ADC_CTRL(void) {
         memParam.windowComparatorSelect = ADC12_B_WINDOW_COMPARATOR_DISABLE;
         memParam.differentialModeSelect = ADC12_B_DIFFERENTIAL_MODE_DISABLE;
         ADC12_B_configureMemory(ADC12_B_BASE, &memParam1);
-
+        // Clearing and Enabling Interrupts for our 2 ADC signals
         ADC12_B_clearInterrupt(ADC12_B_BASE, 0, ADC12_B_IFG0);
         ADC12_B_enableInterrupt(ADC12_B_BASE, ADC12_B_IE0 | ADC12_B_IE1, 0, 0);
 }
@@ -75,10 +76,16 @@ void STATE_CHECK(void) {
                 __no_operation();
         } else if (STATE == POLL) {
                 ADC_CTRL();
+                //TODO Make the ADC actually Run to obtain the values
+                //TODO Add The Comparing Function
+                //TODO
         } else if (STATE == INIT) {
-                //INIT(
+                //TODO Get the User's Information (INIT Function)
+                //TODO
         } else if (STATE == RUNNING) {
-
+                //TODO Make the ADC actually Run to obtain the values
+                //TODO Add the Comparing Function
+                //TODO Add the Running Function
         }
 }
 
@@ -117,7 +124,6 @@ void ADC12_ISR(void) {
         case 10: break;                     // Vector 10:  ADC12BIN
         case 12:                            // Vector 12:  ADC12BMEM0
                 res = ADC12_B_getResults(ADC12_B_BASE, ADC12_B_MEMORY_0);
-                if (STATE == POLLM) {
                         if (currM == 50) {
                                 for (ii = 0; ii < 50; ii++) {
                                         res += MOISTURE[ii];
