@@ -10,12 +10,16 @@
 #include "adc12_b.h"
 #include "cs.h"
 #include "gpio.h"
-#include "rtc_b.h"
+#include "rtc_c.h"
 #include "wdt_a.h"
 // -------------------- Function Declarations --------------------
 // Helper Block
 void STATE_CHECK(void);
+int currToUsrCompare(void); //TODO occurs after ADC has generated a new average value, comparing to the user's value
+int valveOpen(void); //TODO This controls the valve being open and receives the valve response
 // Math Block
+int flowRate(void); //TODO This will be the algorithm to determine water absorption
+int timeCheck(void); //TODO This will utilize the RTC for time-checking
 // GPIO Block
 void GPIO_INIT(void);
 // ADC Block
@@ -41,11 +45,9 @@ typedef struct {
 // Global Variables
 #define MAXNODES 48
 state STATE = INIT;
-int MOISTURE[MAXNODES]; //TODO ADC Sampling put in this Variable
-int TEMPERATURE[MAXNODES]; //TODO ADC Sampling put in this Variable
-const int currM = 0; //TODO Index for Moisture List
-const int currT = 0; //TODO Index for Temperature List
-READ_RESULT CURR_TEMP_MOIST; //TODO This holds average of sampling and value to be displayed
+int MOISTURE[MAXNODES]; // ADC Sampling put in this Variable
+int TEMPERATURE[MAXNODES]; // ADC Sampling put in this Variable
+READ_RESULT CURR_TEMP_MOIST; // This holds average of sampling and value to be displayed
 READ_RESULT USR_TEMP_MOIST; //TODO Set this to the user's desired moisture and temperature
 RUN_RESULT PREV_RESULTS[MAXNODES]; //TODO Set this up for the deterministic algorithm
 #endif /* MAIN_H_ */
