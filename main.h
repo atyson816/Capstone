@@ -44,10 +44,14 @@ typedef struct {
 
 // Global Variables
 #define MAXNODES 48
+Calendar TIME;
 state STATE = INIT;
 int MOISTURE[MAXNODES]; // ADC Sampling put in this Variable
 int TEMPERATURE[MAXNODES]; // ADC Sampling put in this Variable
+int MOISTURE_DONE = 0; // This is to make sure Moisture only gets 48 of the 96 samples
+int TEMPERATURE_DONE = 0; // This is to make sure Temperature only gets 48 of the 96 samples
+int SAMPLES = 96; // This is used to loop to make sure all 48 temp and 48 moisture reading taken.
 READ_RESULT CURR_TEMP_MOIST; // This holds average of sampling and value to be displayed
-READ_RESULT USR_TEMP_MOIST; //TODO Set this to the user's desired moisture and temperature
+READ_RESULT USR_TEMP_MOIST; // Set this to the user's desired moisture and temperature
 RUN_RESULT PREV_RESULTS[MAXNODES]; //TODO Set this up for the deterministic algorithm
 #endif /* MAIN_H_ */
