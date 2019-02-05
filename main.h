@@ -7,25 +7,51 @@
 
 #ifndef MAIN_H_
 #define MAIN_H_
-// Function Declarations
-int ADC_INIT(void);
-int ADC_MOISTURE_CTRL(void);
-int ADC_TEMP_CTRL(void);
-int GPIO_INIT(void);
+#include "adc12_b.h"
+#include "cs.h"
+#include "gpio.h"
+#include "rtc_c.h"
+#include "wdt_a.h"
+// -------------------- Function Declarations --------------------
+// Helper Block
+void STATE_CHECK(void);
+int currToUsrCompare(void); //TODO occurs after ADC has generated a new average value, comparing to the user's value
+int valveOpen(void); //TODO This controls the valve being open and receives the valve response
+// Math Block
+int flowRate(void); //TODO This will be the algorithm to determine water absorption
+int timeCheck(void); //TODO This will utilize the RTC for time-checking
+// GPIO Block
+void GPIO_INIT(void);
+// ADC Block
+void ADC_INIT(void);
+void ADC_CTRL(void);
+//
 void main(void);
 
-// Global Declarations
-enum STATE {INIT, SLEEP, POLLM, POLLT};
+// Global Type Def's
+typedef enum {INIT, SLEEP, POLL, RUNNING} state;
+
 typedef struct {
-    double temp;
-    double moist;
-} AVG_FINAL;
+    double temperature;
+    double moisture;
+} READ_RESULT;
+
+typedef struct {
+    double startTemp;
+    double startMoisture;
+    double finishTime;
+} RUN_RESULT;
 
 // Global Variables
-#define MAXNODES 50
-#define RUNNING 0
-STATE CURR = INIT;
-int ERR = 0;
-int ADC_EN = 0;
-AVG_FINAL AVG_TEMP_MOIST[MAXNODES];
+#define MAXNODES 48
+Calendar TIME;
+state STATE = INIT;
+int MOISTURE[MAXNODES]; // ADC Sampling put in this Variable
+int TEMPERATURE[MAXNODES]; // ADC Sampling put in this Variable
+int MOISTURE_DONE = 0; // This is to make sure Moisture only gets 48 of the 96 samples
+int TEMPERATURE_DONE = 0; // This is to make sure Temperature only gets 48 of the 96 samples
+int SAMPLES = 96; // This is used to loop to make sure all 48 temp and 48 moisture reading taken.
+READ_RESULT CURR_TEMP_MOIST; // This holds average of sampling and value to be displayed
+READ_RESULT USR_TEMP_MOIST; // Set this to the user's desired moisture and temperature
+RUN_RESULT PREV_RESULTS[MAXNODES]; //TODO Set this up for the deterministic algorithm
 #endif /* MAIN_H_ */
