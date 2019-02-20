@@ -26,11 +26,11 @@ void init(void) {
     RTC_C_initCalendar(RTC_C_BASE, &TIME, RTC_C_FORMAT_BINARY);
     // Configuring the Polling Alarm for the Calendar every 30 minutes
     RTC_C_configureCalendarAlarmParam param1 = {0};
-    param.minutesAlarm = 30;
+    param1.minutesAlarm = 30;
     RTC_C_configureCalendarAlarm(RTC_C_BASE, &param1);
     // Configure the RTC to make sure at least 2 hours occur before watering
     // again.
-    RTC_C_setCalendarEvent(RTC_C_CALENDAREVENT_HOURCHANGE);
+    RTC_C_setCalendarEvent(RTC_C_BASE, RTC_C_CALENDAREVENT_HOURCHANGE);
     RTC_C_clearInterrupt(RTC_C_BASE, RTC_C_TIME_EVENT_INTERRUPT + RTC_C_CLOCK_ALARM_INTERRUPT);
     RTC_C_enableInterrupt(RTC_C_BASE, RTC_C_TIME_EVENT_INTERRUPT + RTC_C_CLOCK_ALARM_INTERRUPT);
     RTC_C_startClock(RTC_C_BASE);
@@ -38,7 +38,7 @@ void init(void) {
 }
 
 // ========================= HELPER BLOCK =========================
-void GPIOinputSetup(uint port, uint pin) {
+void GPIOinputSetup(unsigned int port, unsigned int pin) {
     GPIO_setAsInputPinWithPullUpResistor(port, pin);
     GPIO_selectInterruptEdge(port, pin, GPIO_HIGH_TO_LOW_TRANSITION);
     GPIO_clearInterrupt(port, pin);
@@ -46,8 +46,8 @@ void GPIOinputSetup(uint port, uint pin) {
 }
 
 //TODO Implement this
-int currToUsrCompare(void) {
-    return 0;
+void currToUsrCompare(void) {
+
 }
 
 /*
@@ -76,28 +76,28 @@ void valveClose(void) {
  */
 void GPIO_INIT(void) {
     // Clear any floating output -- Enables/Open/Close
-    GPIO_setOutputLowOnPin(GPIO_PORT_PB, GPIO_PIN0 + GPIO_PIN1 + GPIO_PIN5 +
-        GPIO_PIN10);
+    GPIO_setOutputLowOnPin(GPIO_PORT_P2, GPIO_PIN0 + GPIO_PIN1);
+    GPIO_setOutputLowOnPin(GPIO_PORT_P3, GPIO_PIN2);
+    GPIO_setOutputLowOnPin(GPIO_PORT_P9, GPIO_PIN4);
     // Configure GPIO to send out to sensors and valve controller
-    // PIN0 is moisture_enable, 1 is temp_enable, 5 is valve_open, 10 is valve_close
-    GPIO_setAsOutputPin(GPIO_PORT_PB, GPIO_PIN0 + GPIO_PIN1 + GPIO_PIN5 +
-        GPIO_PIN10);
+    // PIN0 is moisture_enable, 1 is temp_enable, 9.4 is valve_open, 10 is valve_close
+    GPIO_setAsOutputPin(GPIO_PORT_P2, GPIO_PIN0 + GPIO_PIN1);
+    GPIO_setAsOutputPin(GPIO_PORT_P3, GPIO_PIN2);
+    GPIO_setAsOutputPin(GPIO_PORT_P9, GPIO_PIN4);
     // Clear any floating output -- Display -- 12 I/O ports
-    GPIO_setOutputLowOnPin(GPIO_PORT_P1, GPIO_PIN3 + GPIO_PIN4 + GPIO_PIN6 +
-        GPIO_PIN7);
-    GPIO_setOutputLowOnPin(GPIO_PORT_PB, GPIO_PIN2 + GPIO_PIN3 + GPIO_PIN6 +
-        GPIO_PIN8 + GPIO_PIN9 + GPIO_PIN11 + GPIO_PIN14 + GPIO_PIN15);
+    GPIO_setOutputLowOnPin(GPIO_PORT_P1, GPIO_PIN3 + GPIO_PIN4 + GPIO_PIN6 + GPIO_PIN7);
+    GPIO_setOutputLowOnPin(GPIO_PORT_P2, GPIO_PIN2 + GPIO_PIN3 + GPIO_PIN6);
+    GPIO_setOutputLowOnPin(GPIO_PORT_P3, GPIO_PIN0 + GPIO_PIN1 + GPIO_PIN3 + GPIO_PIN6 + GPIO_PIN7);
     // Configure display I/O
-    GPIO_setAsOutputPin(GPIO_PORT_P1, GPIO_PIN3 + GPIO_PIN4 + GPIO_PIN6 +
-        GPIO_PIN7);
-    GPIO_setAsOutputPin(GPIO_PORT_PB, GPIO_PIN2 + GPIO_PIN3 + GPIO_PIN6 +
-        GPIO_PIN8 + GPIO_PIN9 + GPIO_PIN11 + GPIO_PIN14 + GPIO_PIN15);
+    GPIO_setAsOutputPin(GPIO_PORT_P1, GPIO_PIN3 + GPIO_PIN4 + GPIO_PIN6 + GPIO_PIN7);
+    GPIO_setAsOutputPin(GPIO_PORT_P2, GPIO_PIN2 + GPIO_PIN3 + GPIO_PIN6);
+    GPIO_setAsOutputPin(GPIO_PORT_P3, GPIO_PIN0 + GPIO_PIN1 + GPIO_PIN3 + GPIO_PIN6 + GPIO_PIN7);
     // Input Pins -- 5 User Buttons
     GPIOinputSetup(GPIO_PORT_P1, GPIO_PIN5);
     GPIOinputSetup(GPIO_PORT_P2, GPIO_PIN4);
+    GPIOinputSetup(GPIO_PORT_P2, GPIO_PIN5);
     GPIOinputSetup(GPIO_PORT_P2, GPIO_PIN7);
     GPIOinputSetup(GPIO_PORT_P4, GPIO_PIN7);
-    GPIOinputSetup(GPIO_PORT_P9, GPIO_PIN4);
     // Disable GPIO power-on default high-impedance.
     PMM_unlockLPM5();
 }
@@ -124,8 +124,8 @@ void ADC_INIT(void) {
  */
 void ADC_CTRL(void) {
         ADC12_B_setupSamplingTimer(ADC12_B_BASE,
-                                   ADC12_B_CYCLEHOLD_16_CYCLES,
-                                   ADC12_B_CYCLEHOLD_16_CYCLES,
+                                   ADC12_B_CYCLEHOLD_4_CYCLES,
+                                   ADC12_B_CYCLEHOLD_4_CYCLES,
                                    ADC12_B_MULTIPLESAMPLESENABLE);
         // Setting up the Memory Config for the Moisture Sensor
         ADC12_B_configureMemoryParam memParam = {0};
@@ -155,7 +155,7 @@ void ADC_CTRL(void) {
  * currToUsrCompare()
  */
 void enableSensors(void) {
-    GPIO_setOutputHighOnPin(GPIO_PORT_PB, GPIO_PIN0 + GPIO_PIN1);
+    GPIO_setOutputHighOnPin(GPIO_PORT_P2, GPIO_PIN0 + GPIO_PIN1);
     // Delay to ensure that the sensors are now enabled.
     __delay_cycles(500000);
 }
@@ -165,7 +165,7 @@ void enableSensors(void) {
  * most likely be used by currToUsrCompare()
  */
 void disableSensors(void) {
-    GPIO_setOutputLowOnPin(GPIO_PORT_PB, GPIO_PIN0 + GPIO_PIN1);
+    GPIO_setOutputLowOnPin(GPIO_PORT_P2, GPIO_PIN0 + GPIO_PIN1);
     // Delay to ensure that the sensors are now disabled.
     __delay_cycles(500000);
 }
@@ -196,7 +196,7 @@ void stateCheck(void) {
         // Puts the Device to sleep waiting on RTC/Button Interrupts.
         __bis_SR_register(LPM3_bits + GIE);
         __no_operation();
-    } else if (STATE == POLL) {
+    } else if (STATE == POLLING) {
         enableSensors();
         runADC();
         //TODO Add The Comparing Function
@@ -208,6 +208,7 @@ void stateCheck(void) {
         //TODO Make the ADC actually Run to obtain the values
         //TODO Add the Comparing Function
         valveOpen();
+        runADC();
     }
 }
 
@@ -216,11 +217,20 @@ void main(void) {
     WDT_A_hold(WDT_A_BASE);
     // Initialize on startup
     GPIO_INIT();
-    ADC_INIT();
-    ADC_CTRL();
+    //ADC_INIT();
+    //ADC_CTRL();
     while(1) {
+        enableSensors();
+        __delay_cycles(10000000);
+        disableSensors();
+        __delay_cycles(10000000);
+        //GPIO_setOutputLowOnPin(GPIO_PORT_PB, GPIO_PIN1);
+        //__delay_cycles(100000000);
+        //GPIO_setOutputHighOnPin(GPIO_PORT_PB, GPIO_PIN1);
+        //GPIO_setOutputLowOnPin(GPIO_PORT_PB, GPIO_PIN0);
+        //__delay_cycles(100000000);
             // State Check Call/Switch
-            stateCheck();
+            //stateCheck();
     }
 }
 
@@ -313,16 +323,6 @@ void Port_4(void) {
 
 }
 
-#pragma vector = PORT9_VECTOR
-__interrupt
-
-/*
- * The Interrupt Handler for Port 9
- */
-void Port_9(void) {
-
-}
-
 
 #pragma vector = RTC_VECTOR
 __interrupt
@@ -331,7 +331,7 @@ __interrupt
 ** Interrupt handler for the RTC_C
 */
 void RTC_ISR(void) {
-    int count;
+    int count = 0;
     switch(__even_in_range(RTCIV, 16)) {
         case RTCIV_RTCTEVIFG:
         // Checks to make sure at least 2 hours between watering.
@@ -339,10 +339,12 @@ void RTC_ISR(void) {
                 count = 0;
                 WATERED = 0;
             } else count += 1;
+            __bis_SR_register_on_exit(LPM3_bits);
             break;
-        case RTCIV_RTCTAIFG:
+        case RTCIV_RTCAIFG:
         // Every half hour, polls the sensors, if haven't watered in last 2 hours.
             if (WATERED == 0) STATE = POLLING;
+            __bis_SR_register_on_exit(LPM3_bits);
             break;
     }
 }
