@@ -112,6 +112,8 @@ void GPIO_INIT(void) {
     P9DIR &= ~ BIT1|BIT2;
     P9SEL1 |= BIT1|BIT2;
     P9SEL0 |= BIT1|BIT2;
+    PJDIR &= ~BIT4|BIT5;
+    PJSEL0 = BIT4|BIT5;
     // Disable GPIO power-on default high-impedance.
     PM5CTL0 &= ~LOCKLPM5;
 }
@@ -189,10 +191,10 @@ void stateCheck(void) {
     }
 }
 
-void TIMER_INIT(void) {
-    TA0CCR0 = 5000;
+void CLOCK_INIT(void) {
     TA0CCTL0 = CCIE;
-    TA0CTL = TASSEL__SMCLK | MC__CONTINOUS | TACLR;
+    TA0CCR0 = 500;
+    TA0CTL = TASSEL_2 | MC_1;
     hd44780_clear_screen();
 }
 
@@ -202,9 +204,13 @@ void main(void) {
     // Initialize on startup
     GPIO_INIT();
     ADC_INIT();
-    TIMER_INIT();
+    CLOCK_INIT();
     while(1) {
-        hd44780_write_string("Hello Ockert!",1,1,NO_CR_LF);
+        runADC();
+        hd44780_write_string("Steffy Boi",1,1,NO_CR_LF);
+        hd44780_clear_row(1);
+        hd44780_write_string("Ocky Boi",1,1,NO_CR_LF);
+        hd44780_write_string("Kendy Boi",2,1,NO_CR_LF);
         __no_operation();
     }
 }
@@ -276,8 +282,7 @@ __interrupt
 /*
  * Interrupt Handler for the Timer Module
  */
-void Timer0_A0_ISR(void) {
-    TA0CCR0 += 5000;
+void TIMER0_A0_ISR(void) {
     hd44780_timer_isr();
 }
 

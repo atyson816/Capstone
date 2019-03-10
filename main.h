@@ -9,7 +9,6 @@
 #define MAIN_H_
 #include <stdio.h>
 #include <stdlib.h>
-#include <msp430fr6989.h>
 #include <hd44780.h>
 // -------------------- Function Declarations --------------------
 // Helper Block
