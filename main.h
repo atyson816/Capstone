@@ -7,12 +7,10 @@
 
 #ifndef MAIN_H_
 #define MAIN_H_
-#include "adc12_b.h"
-#include "cs.h"
-#include "gpio.h"
-#include "rtc_c.h"
-#include "wdt_a.h"
-#include "pmm.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <msp430fr6989.h>
+#include <hd44780.h>
 // -------------------- Function Declarations --------------------
 // Helper Block
 void STATE_CHECK(void);
@@ -43,16 +41,29 @@ typedef struct {
     double finishTime;
 } RUN_RESULT;
 
-// Global Variables
+//Variables
+volatile unsigned int D0P3 = BIT3;
+volatile unsigned int D1P3 = BIT6;
+volatile unsigned int D2P3 = BIT7;
+volatile unsigned int D3P2 = BIT2;
+volatile unsigned int D4P1 = BIT3;
+volatile unsigned int D5P3 = BIT0;
+volatile unsigned int D6P3 = BIT1;
+volatile unsigned int D7P2 = BIT3;
+volatile unsigned int RSP1 = BIT4;
+volatile unsigned int ENP2 = BIT6;
+
 #define MAXNODES 48
-Calendar TIME;
 state STATE = INIT;
-int WATERED = 0;
-int MOISTURE[MAXNODES]; // ADC Sampling put in this Variable
-int TEMPERATURE[MAXNODES]; // ADC Sampling put in this Variable
-int MOISTURE_DONE = 0; // This is to make sure Moisture only gets 48 of the 96 samples
-int TEMPERATURE_DONE = 0; // This is to make sure Temperature only gets 48 of the 96 samples
-int SAMPLES = 96; // This is used to loop to make sure all 48 temp and 48 moisture reading taken.
+unsigned int WATERED = 0;
+unsigned int MOISTURE[MAXNODES]; // ADC Sampling put in this Variable
+unsigned int TEMPERATURE[MAXNODES]; // ADC Sampling put in this Variable
+unsigned int MOISTURE_DONE = 0; // This is to make sure Moisture only gets 48 samples
+unsigned int TEMPERATURE_DONE = 0; // This is to make sure Temperature only gets 48 samples
+unsigned int mSampleIdx = 0; // This is the moisture sample index for the ADC12_ISR.
+unsigned int tSampleIdx = 0; // This is the temperature sample index for the ADC12_ISR.
+unsigned int TEMP_STATUS = 1; // This is used to determine if temperature sensor is on or off.
+unsigned int MOIST_STATUS = 1; // This is used to determine if moisture sensor is on or off.
 READ_RESULT CURR_TEMP_MOIST; // This holds average of sampling and value to be displayed
 READ_RESULT USR_TEMP_MOIST; // Set this to the user's desired moisture and temperature
 RUN_RESULT PREV_RESULTS[MAXNODES]; //TODO Set this up for the deterministic algorithm
