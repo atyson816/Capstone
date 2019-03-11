@@ -12,6 +12,7 @@
 #include <hd44780.h>
 // -------------------- Function Declarations --------------------
 // Helper Block
+void display(void);
 void STATE_CHECK(void);
 void currToUsrCompare(void); //TODO occurs after ADC has generated a new average value, comparing to the user's value
 void valveOpen(void); //This controls the valve being open and receives the valve response
@@ -28,6 +29,14 @@ void main(void);
 
 // Global Type Def's
 typedef enum {INIT, SLEEP, POLLING, RUNNING} state;
+typedef enum {FIRST, TIME, TEMP, MOIS} screens;
+
+typedef struct {
+    unsigned int hourTen;
+    unsigned int hourOne;
+    unsigned int minTen;
+    unsigned int minOne;
+} time;
 
 typedef struct {
     double temperature;
@@ -51,9 +60,10 @@ volatile unsigned int D6P3 = BIT1;
 volatile unsigned int D7P2 = BIT3;
 volatile unsigned int RSP1 = BIT4;
 volatile unsigned int ENP2 = BIT6;
-
+volatile unsigned int SEL = 0;
 #define MAXNODES 48
 state STATE = INIT;
+volatile screens SCREEN = FIRST;
 unsigned int WATERED = 0;
 unsigned int MOISTURE[MAXNODES]; // ADC Sampling put in this Variable
 unsigned int TEMPERATURE[MAXNODES]; // ADC Sampling put in this Variable
@@ -66,4 +76,5 @@ unsigned int MOIST_STATUS = 1; // This is used to determine if moisture sensor i
 READ_RESULT CURR_TEMP_MOIST; // This holds average of sampling and value to be displayed
 READ_RESULT USR_TEMP_MOIST; // Set this to the user's desired moisture and temperature
 RUN_RESULT PREV_RESULTS[MAXNODES]; //TODO Set this up for the deterministic algorithm
+time CURR_TIME;
 #endif /* MAIN_H_ */

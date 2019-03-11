@@ -8,12 +8,13 @@
 // ========================= INIT BLOCK ===========================
 void init(void) {
     volatile unsigned int minute, hour, temperature_threshold, moisture_threshold;
-    //TODO get the user's input of the current time, and threshold values.
-    while(1) {
-
-
-        break;
-    }
+    SCREEN = FIRST;
+    display();
+    //TODO Get all the Initial Values before the system will even begin.
+    CURR_TIME.hourOne;
+    CURR_TIME.hourTen;
+    CURR_TIME.minOne;
+    CURR_TIME.minTen;
     USR_TEMP_MOIST.moisture = moisture_threshold;
     USR_TEMP_MOIST.temperature = temperature_threshold;
     // Creating the calendar, not running yet.
@@ -31,9 +32,9 @@ void init(void) {
     RTCCTL0_H = RTCKEY_H;
     RTCCTL0_L = RTCTEVIE;
     RTCCTL1 =  RTCHOLD | RTCMODE;
-    RTCHOUR = hour;
-    RTCMIN = minute;
-    RTCAMIN = 0;
+    RTCHOUR = (CURR_TIME.hourTen * 10) + CURR_TIME.hourOne;
+    RTCMIN = (CURR_TIME.minTen * 10) + CURR_TIME.minOne;
+    RTCAMIN = 30 | RTCAE;
     STATE = POLLING;
 }
 
@@ -105,9 +106,21 @@ void GPIO_INIT(void) {
     // P2.5 is Down
     // P2.7 is SEL
     // P4.7 is Back
+    P1REN = BIT5;
     P1DIR &= ~ BIT5;
+    P1IE = BIT5;
+    P1IES = BIT5;
+    P1IFG = 0;
+    P2REN &= ~BIT4|BIT5|BIT7;
     P2DIR &= ~ BIT4|BIT5|BIT7;
+    P2IE = BIT4|BIT5|BIT7;
+    P2IES = BIT4|BIT5|BIT7;
+    P2IFG = 0;
     P4DIR &= ~ BIT7;
+    P4REN = BIT7;
+    P4IE = BIT7;
+    P4IES = BIT7;
+    P4IFG = 0;
     // Configuring P9.2 and 9.3 for ADC input sampling.
     P9DIR &= ~ BIT1|BIT2;
     P9SEL1 |= BIT1|BIT2;
@@ -146,14 +159,22 @@ void runADC(void) {
         __no_operation();
     }
 }
+
 /*
  * This function turns on the temperature and moisture sensors, called by
  * currToUsrCompare()
  */
 void enableSensors(void) {
-    P2OUT |= BIT0|BIT1;
-    // Delay to ensure that the sensors are now enabled.
-    __delay_cycles(500000);
+    if (TEMP_STATUS && MOIST_STATUS) {
+        P2OUT |= BIT0|BIT1;
+        __delay_cycles(500000);
+    } else if (TEMP_STATUS) {
+        P2OUT |= BIT1;
+        __delay_cycles(500000);
+    } else if (MOIST_STATUS) {
+        P2OUT |= BIT0;
+        __delay_cycles(500000);
+    }
 }
 
 /*
@@ -162,7 +183,6 @@ void enableSensors(void) {
  */
 void disableSensors(void) {
     P2OUT &= ~ BIT0|BIT1;
-    // Delay to ensure that the sensors are now disabled.
     __delay_cycles(500000);
 }
 
@@ -171,47 +191,72 @@ void disableSensors(void) {
  * functions occur when.
  */
 void stateCheck(void) {
-    if (STATE == SLEEP) {
-        // Puts the Device to sleep waiting on RTC/Button Interrupts.
+    if (STATE == INIT) {
+        init();
+    } else if (STATE == SLEEP) {
         __bis_SR_register(LPM3_bits + GIE);
         __no_operation();
     } else if (STATE == POLLING) {
         enableSensors();
-        //runADC();
+        runADC();
         //TODO Add The Comparing Function
         //TODO
-    } else if (STATE == INIT) {
-        init();
-        //TODO
-    } else if (STATE == RUNNING) {
+    }  else if (STATE == RUNNING) {
         //TODO Make the ADC actually Run to obtain the values
         //TODO Add the Comparing Function
         valveOpen();
-        //runADC();
+        runADC();
     }
 }
 
-void CLOCK_INIT(void) {
+void TIMER_INIT(void) {
     TA0CCTL0 = CCIE;
-    TA0CCR0 = 500;
+    TA0CCR0 = 1000;
     TA0CTL = TASSEL_2 | MC_1;
     hd44780_clear_screen();
 }
 
+void display(void) {
+    if (SCREEN == FIRST) {
+        hd44780_write_string("Welcome!",1,1,NO_CR_LF);
+    } else if (SCREEN == TIME) {
+
+    } else if (SCREEN == TEMP) {
+
+    } else if (SCREEN == MOIS) {
+
+    }
+    hd44780_write_string("Austin is dank",1,1,CR_LF);
+    __no_operation();
+    __delay_cycles(300000);
+    __bis_SR_register(GIE);
+    hd44780_write_string(" ustin is dank",1,1,CR_LF);
+    __no_operation();
+    __delay_cycles(300000);
+    __bis_SR_register(GIE);
+}
+
+void flashScreen(void) {
+    hd44780_write_string("Austin is dank",1,1,CR_LF);
+    __no_operation();
+    __delay_cycles(300000);
+    __bis_SR_register(GIE);
+    hd44780_write_string(" ustin is dank",1,1,CR_LF);
+    __no_operation();
+    __delay_cycles(300000);
+    __bis_SR_register(GIE);
+}
+
 void main(void) {
+    volatile unsigned int temp;
     // Disable Watchdog Timer while Initializing.
     WDTCTL = WDTPW | WDTHOLD;
     // Initialize on startup
     GPIO_INIT();
     ADC_INIT();
-    CLOCK_INIT();
+    TIMER_INIT();
     while(1) {
-        runADC();
-        hd44780_write_string("Steffy Boi",1,1,NO_CR_LF);
-        hd44780_clear_row(1);
-        hd44780_write_string("Ocky Boi",1,1,NO_CR_LF);
-        hd44780_write_string("Kendy Boi",2,1,NO_CR_LF);
-        __no_operation();
+        flashScreen();
     }
 }
 
@@ -293,7 +338,8 @@ __interrupt
  * The Interrupt Handler for Port 1
  */
 void Port_1(void) {
-
+    SEL = 0;
+    P1IFG &= ~BIT5;
 }
 
 #pragma vector = PORT2_VECTOR
@@ -303,7 +349,34 @@ __interrupt
  * The Interrupt Handler for Port 2
  */
 void Port_2(void) {
-
+    if (P2IFG & BIT4) {
+        if (SEL == 1) { // In Screen
+            //TODO SCREEN.cursor --> prev;
+        } else if (SEL == 2) { // In Value
+            //TODO SCREEN.current ++;
+        } else { // Screen to Screen
+            if (SCREEN == TIME) SCREEN = MOIS;
+            else if (SCREEN == TEMP) SCREEN = TIME;
+            else if (SCREEN == MOIS) SCREEN = TEMP;
+        }
+        P2IFG &= ~BIT4;
+    } else if (P2IFG & BIT5) {
+        if (SEL == 1) { // In Screen
+            //TODO SCREEN.cursor --> next;
+        } else if (SEL == 2) { // In Value
+            //TODO SCREEN.current --;
+        } else { // Screen to Screen
+            if (SCREEN == TIME) SCREEN = TEMP;
+            else if (SCREEN == TEMP) SCREEN = MOIS;
+            else if (SCREEN == MOIS) SCREEN = TIME;
+        }
+        P2IFG &= ~BIT5;
+    } else if (P2IFG & BIT7) {
+        if (SEL == 1) SEL = 2;
+        else if (SEL == 0) SEL = 1;
+        else SEL = 2;
+        P2IFG &= ~BIT7;
+    }
 }
 
 #pragma vector = PORT4_VECTOR
@@ -313,7 +386,8 @@ __interrupt
  * The Interrupt Handler for Port 4
  */
 void Port_4(void) {
-
+    if (SEL != 0) SEL--;
+    P4IFG &= ~BIT7;
 }
 
 
