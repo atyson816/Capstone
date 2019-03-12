@@ -19,8 +19,11 @@ void init(void) {
     USR_TEMP_MOIST.temperature = temperature_threshold;
     // Creating the calendar, not running yet.
     //Initialize LFXT1
-    PJSEL0 = BIT4 | BIT5;
-    PM5CTL0 &= ~LOCKLPM5;
+    RTC_INIT();
+    STATE = POLLING;
+}
+
+void RTC_INIT(void) {
     CSCTL0_H = CSKEY >> 8;
     CSCTL4 &= ~LFXTOFF;
     do {
@@ -30,14 +33,22 @@ void init(void) {
     CSCTL0_H = 0;
     // Configure the RTC
     RTCCTL0_H = RTCKEY_H;
-    RTCCTL0_L = RTCTEVIE;
-    RTCCTL1 =  RTCHOLD | RTCMODE;
+    RTCCTL0_L &= ~ RTCRDYIE | RTCOFIFG | RTCTEVIFG | RTCAIFG | RTCRDYIFG;
+    RTCCTL0_L = RTCTEVIE | RTCAIE;
+    RTCCTL1 &= RTCSSEL_0 | RTCBCD;
+    RTCCTL1 =  RTCHOLD | RTCMODE | RTCTEV_1; // RTCEV_0 -- Minute Changed
     RTCHOUR = (CURR_TIME.hourTen * 10) + CURR_TIME.hourOne;
     RTCMIN = (CURR_TIME.minTen * 10) + CURR_TIME.minOne;
     RTCAMIN = 30 | RTCAE;
-    STATE = POLLING;
+    RTCCTL1 &= ~RTCHOLD;
 }
 
+void RTC_UPDATE(void) {
+    RTCCTL1 = RTCHOLD;
+    RTCHOUR = (CURR_TIME.hourTen * 10) + CURR_TIME.hourOne;
+    RTCMIN = (CURR_TIME.minTen * 10) + CURR_TIME.minOne;
+    RTCCTL1 &= ~RTCHOLD;
+}
 // ========================= HELPER BLOCK =========================
 
 //TODO Implement this
@@ -216,47 +227,225 @@ void TIMER_INIT(void) {
     hd44780_clear_screen();
 }
 
-void display(void) {
-    if (SCREEN == FIRST) {
-        hd44780_write_string("Welcome!",1,1,NO_CR_LF);
-    } else if (SCREEN == TIME) {
-
-    } else if (SCREEN == TEMP) {
-
-    } else if (SCREEN == MOIS) {
-
-    }
-    hd44780_write_string("Austin is dank",1,1,CR_LF);
+void timeDisplay(void){
+    uint16_t testTimeHour10 = 2;
+    uint16_t testTimeHour1 = 4;
+    uint16_t testTimeMin10 = 5;
+    uint16_t testTimeMin1 = 9;
+    char* waterToggle = "ON";
+    hd44780_write_string("    TIME",1,1,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testTimeHour10,2,1,9,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testTimeHour1,2,1,10,NO_CR_LF);
+    hd44780_write_string(" ",1,11,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testTimeMin10,2,1,12,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testTimeMin1,2,1,13,NO_CR_LF);
+    hd44780_write_string("    WATER",2,1,NO_CR_LF);
+    hd44780_write_string(waterToggle,2,11,NO_CR_LF);
     __no_operation();
-    __delay_cycles(300000);
-    __bis_SR_register(GIE);
-    hd44780_write_string(" ustin is dank",1,1,CR_LF);
-    __no_operation();
-    __delay_cycles(300000);
     __bis_SR_register(GIE);
 }
+void timeDisplayFlash(int selection){
+    uint16_t testTimeHour10 = 2;
+    uint16_t testTimeHour1 = 4;
+    uint16_t testTimeMin10 = 5;
+    uint16_t testTimeMin1 = 9;
+    char* waterToggle = "ON";
+    if (selection == 1){
+        hd44780_write_string(" ",1,9,NO_CR_LF);
+        __delay_cycles(300000);
+        hd44780_output_unsigned_16bit_value(testTimeHour10,2,1,9,NO_CR_LF);
+        __delay_cycles(300000);
+    }
+    else if (selection == 2){
+        hd44780_write_string(" ",1,10,NO_CR_LF);
+        __delay_cycles(300000);
+        hd44780_output_unsigned_16bit_value(testTimeHour1,2,1,10,NO_CR_LF);
+        __delay_cycles(300000);
+    }
+    else if (selection == 3){
+        hd44780_write_string(" ",1,12,NO_CR_LF);
+         __delay_cycles(300000);
+        hd44780_output_unsigned_16bit_value(testTimeMin10,2,1,12,NO_CR_LF);
+        __delay_cycles(300000);
+    }
+    else if (selection == 4){
+        hd44780_write_string(" ",1,13,NO_CR_LF);
+        __delay_cycles(300000);
+        hd44780_output_unsigned_16bit_value(testTimeMin1,2,1,13,NO_CR_LF);
+        __delay_cycles(300000);
+    }
+    else if (selection == 5){
+        hd44780_write_string("   ",2,11,NO_CR_LF);
+        __delay_cycles(300000);
+        hd44780_write_string(waterToggle,2,11,NO_CR_LF);
+        __delay_cycles(300000);
+    }
+}
+void tempDisplay(void){
+    double doubletestSetTemp10 = 5.6;
+    uint16_t testSetTemp10 = doubletestSetTemp10;
+    uint16_t testSetTemp1 = 0;
+    uint16_t testCurTemp10 = 8;
+    uint16_t testCurTemp1 = 1;
+    uint16_t testTimeHour10 = 2;
+    uint16_t testTimeHour1 = 4;
+    uint16_t testTimeMin10 = 5;
+    uint16_t testTimeMin1 = 9;
+    char* plusOrMinus = "-";
+    char* tempToggle = "OFF";
 
-void flashScreen(void) {
-    hd44780_write_string("Austin is dank",1,1,CR_LF);
+    //First Row
+    hd44780_write_string("TEMP SET+",1,1,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testSetTemp10,2,1,10,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testSetTemp1,2,1,11,NO_CR_LF);
+    hd44780_write_string("C ",1,12,NO_CR_LF);
+    hd44780_write_string(tempToggle,1,14,NO_CR_LF);
+
+    //Second Row
+    hd44780_write_string("CUR",2,1,NO_CR_LF);
+    hd44780_write_string(plusOrMinus,2,4,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testCurTemp10,2,2,5,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testCurTemp1,2,2,6,NO_CR_LF);
+    hd44780_write_string("C TIME",2,7,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testTimeHour10,2,2,13,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testTimeHour1,2,2,14,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testTimeMin10,2,2,15,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testTimeMin1,2,2,16,NO_CR_LF);
     __no_operation();
-    __delay_cycles(300000);
     __bis_SR_register(GIE);
-    hd44780_write_string(" ustin is dank",1,1,CR_LF);
+}
+void tempDisplayFlash(int selection){
+    uint16_t testSetTemp10 = 9;
+    uint16_t testSetTemp1 = 0;
+    char* tempToggle = "OFF";
+    if (selection == 1){
+        hd44780_write_string(" ",1,9,NO_CR_LF);
+        __delay_cycles(300000);
+        hd44780_output_unsigned_16bit_value(testSetTemp10,2,1,10,NO_CR_LF);
+        __delay_cycles(300000);
+    }
+    else if (selection == 2){
+        hd44780_write_string(" ",1,10,NO_CR_LF);
+        __delay_cycles(300000);
+        hd44780_output_unsigned_16bit_value(testSetTemp1,2,1,11,NO_CR_LF);
+        __delay_cycles(300000);
+    }
+    else if (selection == 3){
+        hd44780_write_string("   ",1,14,NO_CR_LF);
+         __delay_cycles(300000);
+         hd44780_write_string(tempToggle,1,14,NO_CR_LF);
+        __delay_cycles(300000);
+    }
+}
+
+void moisDisplay(void){
+    uint16_t testSetMois100 = 0;
+    uint16_t testSetMois10 = 8;
+    uint16_t testSetMois1 = 7;
+    uint16_t testCurMois100 = 0;
+    uint16_t testCurMois10 = 5;
+    uint16_t testCurMois1 = 6;
+    uint16_t testTimeHour10 = 2;
+    uint16_t testTimeHour1 = 3;
+    uint16_t testTimeMin10 = 5;
+    uint16_t testTimeMin1 = 9;
+    char* moisToggle = "OFF";
+
+    //First Row
+    hd44780_write_string("MOIS SET",1,1,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testSetMois100,2,1,9,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testSetMois10,2,1,10,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testSetMois1,2,1,11,NO_CR_LF);
+    hd44780_write_string("% ",1,12,NO_CR_LF);
+    hd44780_write_string(moisToggle,1,14,NO_CR_LF);
+
+    //Second Row
+    hd44780_write_string("CUR",2,1,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testCurMois100,2,2,4,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testCurMois10,2,2,5,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testCurMois1,2,2,6,NO_CR_LF);
+    hd44780_write_string("% TIME",2,7,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testTimeHour10,2,2,13,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testTimeHour1,2,2,14,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testTimeMin10,2,2,15,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testTimeMin1,2,2,16,NO_CR_LF);
     __no_operation();
-    __delay_cycles(300000);
     __bis_SR_register(GIE);
+}
+void moisDisplayFlash(int selection){
+    uint16_t testSetMois100 = 0;
+    uint16_t testSetMois10 = 8;
+    uint16_t testSetMois1 = 7;
+    char* moisToggle = "OFF";
+    if (selection == 1){
+        hd44780_write_string(" ",1,9,NO_CR_LF);
+        __delay_cycles(300000);
+        hd44780_output_unsigned_16bit_value(testSetMois100,2,1,9,NO_CR_LF);
+        __delay_cycles(300000);
+    }
+    else if (selection == 2){
+        hd44780_write_string(" ",1,10,NO_CR_LF);
+        __delay_cycles(300000);
+        hd44780_output_unsigned_16bit_value(testSetMois10,2,1,10,NO_CR_LF);
+        __delay_cycles(300000);
+    }
+    else if (selection == 3){
+        hd44780_write_string(" ",1,10,NO_CR_LF);
+        __delay_cycles(300000);
+        hd44780_output_unsigned_16bit_value(testSetMois1,2,1,11,NO_CR_LF);
+        __delay_cycles(300000);
+    }
+    else if (selection == 4){
+        hd44780_write_string("   ",1,14,NO_CR_LF);
+         __delay_cycles(300000);
+         hd44780_write_string(moisToggle,1,14,NO_CR_LF);
+        __delay_cycles(300000);
+    }
+}
+void display(void) {
+    int selection = 4;
+    if (SCREEN == FIRST) {
+        SCREEN = MOIS; //Current screen that is being tested
+        moisDisplay(); //Prints screen once in case you are flashing a part and haven't initialized the screen
+    } else if (SCREEN == TIME) {
+        if(selection != 0){
+            timeDisplayFlash(selection);
+        }
+        else {
+            timeDisplay();
+        }
+    } else if (SCREEN == TEMP) {
+        if(selection != 0){
+            tempDisplayFlash(selection);
+        }
+        else {
+            tempDisplay();
+        }
+
+    } else if (SCREEN == MOIS) {
+        if(selection != 0){
+            moisDisplayFlash(selection);
+        }
+        else {
+            moisDisplay();
+        }
+
+    }
+
 }
 
 void main(void) {
     volatile unsigned int temp;
     // Disable Watchdog Timer while Initializing.
+
     WDTCTL = WDTPW | WDTHOLD;
     // Initialize on startup
     GPIO_INIT();
     ADC_INIT();
     TIMER_INIT();
+    SCREEN = FIRST;
     while(1) {
-        flashScreen();
+        display();
     }
 }
 
@@ -349,9 +538,9 @@ __interrupt
  * The Interrupt Handler for Port 2
  */
 void Port_2(void) {
-    if (P2IFG & BIT4) {
+    if (P2IFG & BIT4) { // UP
         if (SEL == 1) { // In Screen
-            //TODO SCREEN.cursor --> prev;
+            if (CURSOR != 1) CURSOR --;
         } else if (SEL == 2) { // In Value
             //TODO SCREEN.current ++;
         } else { // Screen to Screen
@@ -360,9 +549,11 @@ void Port_2(void) {
             else if (SCREEN == MOIS) SCREEN = TEMP;
         }
         P2IFG &= ~BIT4;
-    } else if (P2IFG & BIT5) {
+    } else if (P2IFG & BIT5) { // DOWN
         if (SEL == 1) { // In Screen
-            //TODO SCREEN.cursor --> next;
+            if (SCREEN == TIME && CURSOR != 5) CURSOR++;
+            if (SCREEN == TEMP && CURSOR != 3) CURSOR++;
+            if (SCREEN == MOIS && CURSOR != 4) CURSOR++;
         } else if (SEL == 2) { // In Value
             //TODO SCREEN.current --;
         } else { // Screen to Screen
@@ -411,6 +602,7 @@ void RTC_ISR(void) {
         case RTCIV_RTCAIFG:
         // Every half hour, polls the sensors, if haven't watered in last 2 hours.
             if (WATERED == 0) STATE = POLLING;
+
             __bis_SR_register_on_exit(LPM3_bits);
             break;
     }

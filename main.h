@@ -61,7 +61,7 @@ volatile unsigned int D7P2 = BIT3;
 volatile unsigned int RSP1 = BIT4;
 volatile unsigned int ENP2 = BIT6;
 volatile unsigned int SEL = 0;
-#define MAXNODES 48
+volatile unsigned int CURSOR = 1;
 state STATE = INIT;
 volatile screens SCREEN = FIRST;
 unsigned int WATERED = 0;
@@ -77,4 +77,8 @@ READ_RESULT CURR_TEMP_MOIST; // This holds average of sampling and value to be d
 READ_RESULT USR_TEMP_MOIST; // Set this to the user's desired moisture and temperature
 RUN_RESULT PREV_RESULTS[MAXNODES]; //TODO Set this up for the deterministic algorithm
 time CURR_TIME;
+unsigned int firstScreen [];
+unsigned int timeScreen [];
+unsigned int moistScreen [];
+unsigned int tempScreen [];
 #endif /* MAIN_H_ */
