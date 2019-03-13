@@ -61,9 +61,10 @@ volatile unsigned int D7P2 = BIT3;
 volatile unsigned int RSP1 = BIT4;
 volatile unsigned int ENP2 = BIT6;
 volatile unsigned int SEL = 0;
-volatile unsigned int CURSOR = 1;
+volatile unsigned int CURSOR = 0;
 state STATE = INIT;
 volatile screens SCREEN = FIRST;
+#define MAXNODES 30
 unsigned int WATERED = 0;
 unsigned int MOISTURE[MAXNODES]; // ADC Sampling put in this Variable
 unsigned int TEMPERATURE[MAXNODES]; // ADC Sampling put in this Variable
@@ -71,12 +72,12 @@ unsigned int MOISTURE_DONE = 0; // This is to make sure Moisture only gets 48 sa
 unsigned int TEMPERATURE_DONE = 0; // This is to make sure Temperature only gets 48 samples
 unsigned int mSampleIdx = 0; // This is the moisture sample index for the ADC12_ISR.
 unsigned int tSampleIdx = 0; // This is the temperature sample index for the ADC12_ISR.
-unsigned int TEMP_STATUS = 1; // This is used to determine if temperature sensor is on or off.
-unsigned int MOIST_STATUS = 1; // This is used to determine if moisture sensor is on or off.
-READ_RESULT CURR_TEMP_MOIST; // This holds average of sampling and value to be displayed
-READ_RESULT USR_TEMP_MOIST; // Set this to the user's desired moisture and temperature
-RUN_RESULT PREV_RESULTS[MAXNODES]; //TODO Set this up for the deterministic algorithm
-time CURR_TIME;
+volatile unsigned int TEMP_STATUS = 1; // This is used to determine if temperature sensor is on or off.
+volatile unsigned int MOIST_STATUS = 1; // This is used to determine if moisture sensor is on or off.
+volatile READ_RESULT CURR_TEMP_MOIST; // This holds average of sampling and value to be displayed
+volatile READ_RESULT USR_TEMP_MOIST; // Set this to the user's desired moisture and temperature
+volatile RUN_RESULT PREV_RESULTS[MAXNODES]; //TODO Set this up for the deterministic algorithm
+volatile time CURR_TIME;
 unsigned int firstScreen [];
 unsigned int timeScreen [];
 unsigned int moistScreen [];

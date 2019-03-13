@@ -17,9 +17,6 @@ void init(void) {
     CURR_TIME.minTen;
     USR_TEMP_MOIST.moisture = moisture_threshold;
     USR_TEMP_MOIST.temperature = temperature_threshold;
-    // Creating the calendar, not running yet.
-    //Initialize LFXT1
-    RTC_INIT();
     STATE = POLLING;
 }
 
@@ -33,21 +30,11 @@ void RTC_INIT(void) {
     CSCTL0_H = 0;
     // Configure the RTC
     RTCCTL0_H = RTCKEY_H;
-    RTCCTL0_L &= ~ RTCRDYIE | RTCOFIFG | RTCTEVIFG | RTCAIFG | RTCRDYIFG;
     RTCCTL0_L = RTCTEVIE | RTCAIE;
-    RTCCTL1 &= RTCSSEL_0 | RTCBCD;
-    RTCCTL1 =  RTCHOLD | RTCMODE | RTCTEV_1; // RTCEV_0 -- Minute Changed
+    RTCCTL1 =  RTCHOLD | RTCMODE;
     RTCHOUR = (CURR_TIME.hourTen * 10) + CURR_TIME.hourOne;
     RTCMIN = (CURR_TIME.minTen * 10) + CURR_TIME.minOne;
     RTCAMIN = 30 | RTCAE;
-    RTCCTL1 &= ~RTCHOLD;
-}
-
-void RTC_UPDATE(void) {
-    RTCCTL1 = RTCHOLD;
-    RTCHOUR = (CURR_TIME.hourTen * 10) + CURR_TIME.hourOne;
-    RTCMIN = (CURR_TIME.minTen * 10) + CURR_TIME.minOne;
-    RTCCTL1 &= ~RTCHOLD;
 }
 // ========================= HELPER BLOCK =========================
 
@@ -119,16 +106,19 @@ void GPIO_INIT(void) {
     // P4.7 is Back
     P1REN = BIT5;
     P1DIR &= ~ BIT5;
+    P1OUT &= ~BIT5;
     P1IE = BIT5;
     P1IES = BIT5;
     P1IFG = 0;
-    P2REN &= ~BIT4|BIT5|BIT7;
     P2DIR &= ~ BIT4|BIT5|BIT7;
+    P2REN = BIT4|BIT5|BIT7;
+    P2OUT &= ~BIT4|BIT5|BIT7;
     P2IE = BIT4|BIT5|BIT7;
     P2IES = BIT4|BIT5|BIT7;
     P2IFG = 0;
     P4DIR &= ~ BIT7;
     P4REN = BIT7;
+    P4OUT &= ~BIT7;
     P4IE = BIT7;
     P4IES = BIT7;
     P4IFG = 0;
@@ -228,53 +218,56 @@ void TIMER_INIT(void) {
 }
 
 void timeDisplay(void){
-    uint16_t testTimeHour10 = 2;
-    uint16_t testTimeHour1 = 4;
-    uint16_t testTimeMin10 = 5;
-    uint16_t testTimeMin1 = 9;
+    uint16_t testCURR_TIMEhourTen = 2;
+    uint16_t testCURR_TIMEhourOne = 4;
+    uint16_t testCURR_TIMEminTen = 5;
+    uint16_t testCURR_TIMEminOne = 9;
     char* waterToggle = "ON";
     hd44780_write_string("    TIME",1,1,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testTimeHour10,2,1,9,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testTimeHour1,2,1,10,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testCURR_TIMEhourTen,2,1,9,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testCURR_TIMEhourOne,2,1,10,NO_CR_LF);
     hd44780_write_string(" ",1,11,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testTimeMin10,2,1,12,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testTimeMin1,2,1,13,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testCURR_TIMEminTen,2,1,12,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testCURR_TIMEminOne,2,1,13,NO_CR_LF);
+    hd44780_write_string("   ",1,14,NO_CR_LF);
     hd44780_write_string("    WATER",2,1,NO_CR_LF);
     hd44780_write_string(waterToggle,2,11,NO_CR_LF);
+    hd44780_write_string("    ",2,13,NO_CR_LF);
     __no_operation();
     __bis_SR_register(GIE);
 }
-void timeDisplayFlash(int selection){
-    uint16_t testTimeHour10 = 2;
-    uint16_t testTimeHour1 = 4;
-    uint16_t testTimeMin10 = 5;
-    uint16_t testTimeMin1 = 9;
+
+void timeDisplayFlash(void){
+    uint16_t testCURR_TIMEhourTen = 2;
+    uint16_t testCURR_TIMEhourOne = 4;
+    uint16_t testCURR_TIMEminTen = 5;
+    uint16_t testCURR_TIMEminOne = 9;
     char* waterToggle = "ON";
-    if (selection == 1){
+    if (CURSOR == 1){
         hd44780_write_string(" ",1,9,NO_CR_LF);
         __delay_cycles(300000);
-        hd44780_output_unsigned_16bit_value(testTimeHour10,2,1,9,NO_CR_LF);
+        hd44780_output_unsigned_16bit_value(testCURR_TIMEhourTen,2,1,9,NO_CR_LF);
         __delay_cycles(300000);
     }
-    else if (selection == 2){
+    else if (CURSOR == 2){
         hd44780_write_string(" ",1,10,NO_CR_LF);
         __delay_cycles(300000);
-        hd44780_output_unsigned_16bit_value(testTimeHour1,2,1,10,NO_CR_LF);
+        hd44780_output_unsigned_16bit_value(testCURR_TIMEhourOne,2,1,10,NO_CR_LF);
         __delay_cycles(300000);
     }
-    else if (selection == 3){
+    else if (CURSOR == 3){
         hd44780_write_string(" ",1,12,NO_CR_LF);
          __delay_cycles(300000);
-        hd44780_output_unsigned_16bit_value(testTimeMin10,2,1,12,NO_CR_LF);
+        hd44780_output_unsigned_16bit_value(testCURR_TIMEminTen,2,1,12,NO_CR_LF);
         __delay_cycles(300000);
     }
-    else if (selection == 4){
+    else if (CURSOR == 4){
         hd44780_write_string(" ",1,13,NO_CR_LF);
         __delay_cycles(300000);
-        hd44780_output_unsigned_16bit_value(testTimeMin1,2,1,13,NO_CR_LF);
+        hd44780_output_unsigned_16bit_value(testCURR_TIMEminOne,2,1,13,NO_CR_LF);
         __delay_cycles(300000);
     }
-    else if (selection == 5){
+    else if (CURSOR == 5){
         hd44780_write_string("   ",2,11,NO_CR_LF);
         __delay_cycles(300000);
         hd44780_write_string(waterToggle,2,11,NO_CR_LF);
@@ -287,19 +280,19 @@ void tempDisplay(void){
     uint16_t testSetTemp1 = 0;
     uint16_t testCurTemp10 = 8;
     uint16_t testCurTemp1 = 1;
-    uint16_t testTimeHour10 = 2;
-    uint16_t testTimeHour1 = 4;
-    uint16_t testTimeMin10 = 5;
-    uint16_t testTimeMin1 = 9;
+    uint16_t testCURR_TIMEhourTen = 2;
+    uint16_t testCURR_TIMEhourOne = 4;
+    uint16_t testCURR_TIMEminTen = 5;
+    uint16_t testCURR_TIMEminOne = 9;
     char* plusOrMinus = "-";
-    char* tempToggle = "OFF";
+    char* TEMP_STATUS = "OFF";
 
     //First Row
     hd44780_write_string("TEMP SET+",1,1,NO_CR_LF);
     hd44780_output_unsigned_16bit_value(testSetTemp10,2,1,10,NO_CR_LF);
     hd44780_output_unsigned_16bit_value(testSetTemp1,2,1,11,NO_CR_LF);
     hd44780_write_string("C ",1,12,NO_CR_LF);
-    hd44780_write_string(tempToggle,1,14,NO_CR_LF);
+    hd44780_write_string(TEMP_STATUS,1,14,NO_CR_LF);
 
     //Second Row
     hd44780_write_string("CUR",2,1,NO_CR_LF);
@@ -307,57 +300,62 @@ void tempDisplay(void){
     hd44780_output_unsigned_16bit_value(testCurTemp10,2,2,5,NO_CR_LF);
     hd44780_output_unsigned_16bit_value(testCurTemp1,2,2,6,NO_CR_LF);
     hd44780_write_string("C TIME",2,7,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testTimeHour10,2,2,13,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testTimeHour1,2,2,14,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testTimeMin10,2,2,15,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testTimeMin1,2,2,16,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testCURR_TIMEhourTen,2,2,13,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testCURR_TIMEhourOne,2,2,14,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testCURR_TIMEminTen,2,2,15,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testCURR_TIMEminOne,2,2,16,NO_CR_LF);
     __no_operation();
     __bis_SR_register(GIE);
 }
-void tempDisplayFlash(int selection){
+void tempDisplayFlash(void){
     uint16_t testSetTemp10 = 9;
     uint16_t testSetTemp1 = 0;
-    char* tempToggle = "OFF";
-    if (selection == 1){
+    char* TEMP_STATUS = "OFF";
+    if (CURSOR == 1){
         hd44780_write_string(" ",1,9,NO_CR_LF);
         __delay_cycles(300000);
         hd44780_output_unsigned_16bit_value(testSetTemp10,2,1,10,NO_CR_LF);
         __delay_cycles(300000);
     }
-    else if (selection == 2){
+    else if (CURSOR == 2){
         hd44780_write_string(" ",1,10,NO_CR_LF);
         __delay_cycles(300000);
         hd44780_output_unsigned_16bit_value(testSetTemp1,2,1,11,NO_CR_LF);
         __delay_cycles(300000);
     }
-    else if (selection == 3){
+    else if (CURSOR == 3){
         hd44780_write_string("   ",1,14,NO_CR_LF);
          __delay_cycles(300000);
-         hd44780_write_string(tempToggle,1,14,NO_CR_LF);
+         hd44780_write_string(TEMP_STATUS,1,14,NO_CR_LF);
         __delay_cycles(300000);
     }
 }
 
 void moisDisplay(void){
-    uint16_t testSetMois100 = 0;
-    uint16_t testSetMois10 = 8;
-    uint16_t testSetMois1 = 7;
+    unsigned int umois;
+    unsigned int umois100;
+    unsigned int umois10;
+    unsigned int umois1;
+    umois = USR_TEMP_MOIST.moisture;
+    umois100 = umois / 100;
+    umois10 = (umois % 100) / 10;
+    umois1 = umois % 10;
     uint16_t testCurMois100 = 0;
     uint16_t testCurMois10 = 5;
     uint16_t testCurMois1 = 6;
-    uint16_t testTimeHour10 = 2;
-    uint16_t testTimeHour1 = 3;
-    uint16_t testTimeMin10 = 5;
-    uint16_t testTimeMin1 = 9;
-    char* moisToggle = "OFF";
+    uint16_t testCURR_TIMEhourTen = 2;
+    uint16_t testCURR_TIMEhourOne = 3;
+    uint16_t testCURR_TIMEminTen = 5;
+    uint16_t testCURR_TIMEminOne = 9;
 
     //First Row
     hd44780_write_string("MOIS SET",1,1,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testSetMois100,2,1,9,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testSetMois10,2,1,10,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testSetMois1,2,1,11,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(umois100,2,1,9,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(umois10,2,1,10,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(umois1,2,1,11,NO_CR_LF);
     hd44780_write_string("% ",1,12,NO_CR_LF);
-    hd44780_write_string(moisToggle,1,14,NO_CR_LF);
+    if (MOIST_STATUS == 1) hd44780_write_string("ON",1,14,NO_CR_LF);
+    else if (MOIST_STATUS == 0) hd44780_write_string("OFF",1,14,NO_CR_LF);
 
     //Second Row
     hd44780_write_string("CUR",2,1,NO_CR_LF);
@@ -365,73 +363,77 @@ void moisDisplay(void){
     hd44780_output_unsigned_16bit_value(testCurMois10,2,2,5,NO_CR_LF);
     hd44780_output_unsigned_16bit_value(testCurMois1,2,2,6,NO_CR_LF);
     hd44780_write_string("% TIME",2,7,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testTimeHour10,2,2,13,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testTimeHour1,2,2,14,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testTimeMin10,2,2,15,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testTimeMin1,2,2,16,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testCURR_TIMEhourTen,2,2,13,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testCURR_TIMEhourOne,2,2,14,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testCURR_TIMEminTen,2,2,15,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(testCURR_TIMEminOne,2,2,16,NO_CR_LF);
     __no_operation();
     __bis_SR_register(GIE);
 }
-void moisDisplayFlash(int selection){
-    uint16_t testSetMois100 = 0;
-    uint16_t testSetMois10 = 8;
-    uint16_t testSetMois1 = 7;
+
+void moisDisplayFlash(void){
+    unsigned int mois;
+    unsigned int mois100;
+    unsigned int mois10;
+    unsigned int mois1;
+    mois = USR_TEMP_MOIST.moisture;
+    mois100 = mois / 100;
+    mois10 = (mois % 100) / 10;
+    mois1 = mois % 10;
     char* moisToggle = "OFF";
-    if (selection == 1){
+    if (CURSOR == 1){
         hd44780_write_string(" ",1,9,NO_CR_LF);
         __delay_cycles(300000);
-        hd44780_output_unsigned_16bit_value(testSetMois100,2,1,9,NO_CR_LF);
+        hd44780_output_unsigned_16bit_value(mois100,2,1,9,NO_CR_LF);
         __delay_cycles(300000);
     }
-    else if (selection == 2){
+    else if (CURSOR == 2){
         hd44780_write_string(" ",1,10,NO_CR_LF);
         __delay_cycles(300000);
-        hd44780_output_unsigned_16bit_value(testSetMois10,2,1,10,NO_CR_LF);
+        hd44780_output_unsigned_16bit_value(mois10,2,1,10,NO_CR_LF);
         __delay_cycles(300000);
     }
-    else if (selection == 3){
-        hd44780_write_string(" ",1,10,NO_CR_LF);
+    else if (CURSOR == 3){
+        hd44780_write_string(" ",1,11,NO_CR_LF);
         __delay_cycles(300000);
-        hd44780_output_unsigned_16bit_value(testSetMois1,2,1,11,NO_CR_LF);
+        hd44780_output_unsigned_16bit_value(mois1,2,1,11,NO_CR_LF);
         __delay_cycles(300000);
     }
-    else if (selection == 4){
+    else if (CURSOR == 4){
         hd44780_write_string("   ",1,14,NO_CR_LF);
          __delay_cycles(300000);
          hd44780_write_string(moisToggle,1,14,NO_CR_LF);
         __delay_cycles(300000);
     }
 }
+
 void display(void) {
-    int selection = 4;
+
     if (SCREEN == FIRST) {
         SCREEN = MOIS; //Current screen that is being tested
         moisDisplay(); //Prints screen once in case you are flashing a part and haven't initialized the screen
     } else if (SCREEN == TIME) {
-        if(selection != 0){
-            timeDisplayFlash(selection);
+        if(CURSOR != 0){
+            timeDisplayFlash();
         }
         else {
             timeDisplay();
         }
     } else if (SCREEN == TEMP) {
-        if(selection != 0){
-            tempDisplayFlash(selection);
+        if(CURSOR != 0){
+            tempDisplayFlash();
         }
         else {
             tempDisplay();
         }
-
     } else if (SCREEN == MOIS) {
-        if(selection != 0){
-            moisDisplayFlash(selection);
+        if(CURSOR != 0){
+            moisDisplayFlash();
         }
         else {
             moisDisplay();
         }
-
     }
-
 }
 
 void main(void) {
@@ -443,9 +445,11 @@ void main(void) {
     GPIO_INIT();
     ADC_INIT();
     TIMER_INIT();
+    RTC_INIT();
     SCREEN = FIRST;
     while(1) {
         display();
+        //stateCheck();
     }
 }
 
@@ -477,7 +481,7 @@ void ADC12_ISR(void) {
                     for (ii = 29; ii > 0; ii--) {
                         tRes += TEMPERATURE[ii];
                     }
-                    CURR_TEMP_MOIST.temperature = tRes/29;
+                    CURR_TEMP_MOIST.temperature = (((tRes/29) * 0.0033) / 0.06);
                     __no_operation();
                 } else {
                     TEMPERATURE[tSampleIdx] = tRes;
@@ -495,7 +499,7 @@ void ADC12_ISR(void) {
                     for (ii = 29; ii > 0; ii--) {
                         mRes += MOISTURE[ii];
                     }
-                    CURR_TEMP_MOIST.moisture = mRes/30;
+                    CURR_TEMP_MOIST.moisture = (((mRes/29) * 0.0033) / 0.033);
                     __no_operation();
                 } else {
                     MOISTURE[mSampleIdx] = mRes;
@@ -527,7 +531,7 @@ __interrupt
  * The Interrupt Handler for Port 1
  */
 void Port_1(void) {
-    SEL = 0;
+    //SEL = 0;
     P1IFG &= ~BIT5;
 }
 
@@ -540,34 +544,131 @@ __interrupt
 void Port_2(void) {
     if (P2IFG & BIT4) { // UP
         if (SEL == 1) { // In Screen
-            if (CURSOR != 1) CURSOR --;
+            if (CURSOR != 1) CURSOR--;
+            else CURSOR = 1;
         } else if (SEL == 2) { // In Value
-            //TODO SCREEN.current ++;
-        } else { // Screen to Screen
+            if (SCREEN == TIME){
+                if (CURSOR == 1){
+                    if (CURR_TIME.hourTen < 2) CURR_TIME.hourTen ++;
+                }
+                else if (CURSOR == 2){
+                    if ((CURR_TIME.hourTen == 2) && (CURR_TIME.hourOne > 3)) CURR_TIME.hourOne = 0;
+                    else if ((CURR_TIME.hourTen == 2) && (CURR_TIME.hourOne < 3)) CURR_TIME.hourOne++;
+                    else if ((CURR_TIME.hourTen < 2) && (CURR_TIME.hourOne < 9)) CURR_TIME.hourOne++;
+                }
+                else if (CURSOR == 3){
+                    if(CURR_TIME.minTen < 5 ) CURR_TIME.minTen ++;
+                }
+                else if (CURSOR == 4){
+                    if (CURR_TIME.minOne < 9) CURR_TIME.minOne++;
+                }
+                /*else if (CURSOR == 5){
+                    if(waterToggle == "OFF") waterToggle == "ON";
+                    else if (waterToggle == "ON") waterToggle == "OFF";
+                }*/
+            }
+            else if (SCREEN == TEMP){
+                if (CURSOR == 1){
+                    if (USR_TEMP_MOIST.temperature/10 != 5) USR_TEMP_MOIST.temperature += 10;
+                }
+                else if (CURSOR == 2){
+                    if (USR_TEMP_MOIST.temperature < 50) USR_TEMP_MOIST.temperature++;
+                }
+                else if (CURSOR == 3){
+                    if(TEMP_STATUS == 1) TEMP_STATUS = 0;
+                    else if (TEMP_STATUS == 0) TEMP_STATUS = 1;
+                }
+            }
+            else if (SCREEN == MOIS) {
+                if (CURSOR == 1) {
+                    USR_TEMP_MOIST.moisture = 100;
+                }
+                else if (CURSOR == 2) {
+                    if (USR_TEMP_MOIST.moisture < 90) USR_TEMP_MOIST.moisture += 10;
+                    else USR_TEMP_MOIST.moisture = 100;
+                }
+                else if (CURSOR == 3) {
+                    if(USR_TEMP_MOIST.moisture < 100) USR_TEMP_MOIST.moisture++;
+                    else USR_TEMP_MOIST.moisture = 100;
+                }
+                else if (CURSOR == 4){
+                    if(MOIST_STATUS == 1) MOIST_STATUS = 0;
+                    else if (MOIST_STATUS == 0) MOIST_STATUS = 1;
+                }
+            }
+        } else if (SEL == 0) { // Screen to Screen
             if (SCREEN == TIME) SCREEN = MOIS;
             else if (SCREEN == TEMP) SCREEN = TIME;
             else if (SCREEN == MOIS) SCREEN = TEMP;
         }
-        P2IFG &= ~BIT4;
+        P2IFG = 0;
     } else if (P2IFG & BIT5) { // DOWN
         if (SEL == 1) { // In Screen
             if (SCREEN == TIME && CURSOR != 5) CURSOR++;
-            if (SCREEN == TEMP && CURSOR != 3) CURSOR++;
+            else CURSOR = CURSOR;
             if (SCREEN == MOIS && CURSOR != 4) CURSOR++;
+            else CURSOR = CURSOR;
+            if (SCREEN == TEMP && CURSOR != 3) CURSOR++;
+            else CURSOR = CURSOR;
         } else if (SEL == 2) { // In Value
-            //TODO SCREEN.current --;
+            if (SCREEN == TIME){
+                if (CURSOR == 1){
+                    if (CURR_TIME.hourTen != 0) CURR_TIME.hourTen--;
+                }
+                else if (CURSOR == 2){
+                    if(CURR_TIME.hourOne != 0) CURR_TIME.hourOne--;
+                }
+                else if (CURSOR == 3){
+                    if(CURR_TIME.minTen != 0) CURR_TIME.minTen--;
+                }
+                else if (CURSOR == 4){
+                    if(CURR_TIME.minOne != 0) CURR_TIME.minOne--;
+                }
+                /*else if (CURSOR == 5){
+                    if(waterToggle == "OFF") waterToggle == "ON";
+                    else if (waterToggle == "ON") waterToggle == "OFF";
+                }*/
+            }
+            else if (SCREEN == TEMP){
+                if (CURSOR == 1){
+                    if (USR_TEMP_MOIST.temperature > 9) USR_TEMP_MOIST.temperature-= 10;
+                }
+                else if (CURSOR == 2){
+                    if(USR_TEMP_MOIST.temperature > 0) USR_TEMP_MOIST.temperature--;
+                }
+                else if (CURSOR == 3){
+                    if(TEMP_STATUS) TEMP_STATUS = 0;
+                    else if (TEMP_STATUS == 0) TEMP_STATUS = 1;
+                }
+            }
+            else if (SCREEN == MOIS){
+                if (CURSOR == 1){
+                    if (USR_TEMP_MOIST.moisture == 100) USR_TEMP_MOIST.moisture = 0;
+                }
+                else if (CURSOR == 2){
+                    if(USR_TEMP_MOIST.moisture > 9) USR_TEMP_MOIST.moisture -= 10;
+                }
+                else if (CURSOR == 3){
+                    if(USR_TEMP_MOIST.moisture > 0) USR_TEMP_MOIST.moisture--;
+                }
+                else if (CURSOR == 4){
+                    if(MOIST_STATUS == 1) MOIST_STATUS = 0;
+                    else if (MOIST_STATUS == 0) MOIST_STATUS = 1;
+                }
+            }
         } else { // Screen to Screen
             if (SCREEN == TIME) SCREEN = TEMP;
             else if (SCREEN == TEMP) SCREEN = MOIS;
             else if (SCREEN == MOIS) SCREEN = TIME;
         }
-        P2IFG &= ~BIT5;
-    } else if (P2IFG & BIT7) {
+        P2IFG = 0;
+    } else if (P2IFG & BIT7) { // SELECT
         if (SEL == 1) SEL = 2;
         else if (SEL == 0) SEL = 1;
         else SEL = 2;
-        P2IFG &= ~BIT7;
+        P2IFG = 0;
     }
+
 }
 
 #pragma vector = PORT4_VECTOR
@@ -577,7 +678,7 @@ __interrupt
  * The Interrupt Handler for Port 4
  */
 void Port_4(void) {
-    if (SEL != 0) SEL--;
+    //if (SEL != 0) SEL--;
     P4IFG &= ~BIT7;
 }
 
@@ -593,16 +694,23 @@ void RTC_ISR(void) {
     switch(__even_in_range(RTCIV, 16)) {
         case RTCIV_RTCTEVIFG:
         // Checks to make sure at least 2 hours between watering.
-            if (count == 2) {
+            if (WATERED == 1) {
+                if (count == 2) {
+                    count = 0;
+                    WATERED = 0;
+                } else {
+                    count += 1;
+                }
+            } else if (WATERED == 0) {
                 count = 0;
-                WATERED = 0;
-            } else count += 1;
+            }
             __bis_SR_register_on_exit(LPM3_bits);
             break;
         case RTCIV_RTCAIFG:
         // Every half hour, polls the sensors, if haven't watered in last 2 hours.
             if (WATERED == 0) STATE = POLLING;
-
+            if ((RTCAMIN & 0x63) == 30) RTCAMIN = 60 | 0x80;
+            else RTCAMIN = 30 | 0x80;
             __bis_SR_register_on_exit(LPM3_bits);
             break;
     }
