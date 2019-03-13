@@ -12,6 +12,7 @@
 #include <hd44780.h>
 // -------------------- Function Declarations --------------------
 // Helper Block
+void delay(void);
 void display(void);
 void STATE_CHECK(void);
 void currToUsrCompare(void); //TODO occurs after ADC has generated a new average value, comparing to the user's value
@@ -29,7 +30,7 @@ void main(void);
 
 // Global Type Def's
 typedef enum {INIT, SLEEP, POLLING, RUNNING} state;
-typedef enum {FIRST, TIME, TEMP, MOIS} screens;
+typedef enum {TIME, TEMP, MOIS} screens;
 
 typedef struct {
     unsigned int hourTen;
@@ -60,26 +61,42 @@ volatile unsigned int D6P3 = BIT1;
 volatile unsigned int D7P2 = BIT3;
 volatile unsigned int RSP1 = BIT4;
 volatile unsigned int ENP2 = BIT6;
+// SEL=0: UP/DN scroll screens      SEL increases itself to 1       BACK does nothing
+// SEL=1: UP/DN scroll CURSOR       SEL increases itself to 2       BACK decreases SEL to 0
+// SEL=2: UP/DN scroll values       SEL does nothing                BACK decreases SEL to 1
 volatile unsigned int SEL = 0;
+// CURSOR=0: Deactivated
+// TIME:
+// CURSOR=1 HOUR 10's place         (0-2)
+// CURSOR=2 HOUR 1's place          (0-9)
+// CURSOR=3 MINUTES 10's place      (0-5)
+// CURSOR=4 MINUTES 1's place       (0-9)
+// CURSOR=5 WATER toggle            (ON/OFF)
+// TEMP:
+// CURSOR=1 TEMP 10's place         (0-5)
+// CURSOR=2 TEMP 1's place          (0-9)
+// CURSOR=3 TEMP sensor toggle      (ON/OFF)
+// MOIS:
+// CURSOR=1 MOISTURE 100's place    (0-1)
+// CURSOR=2 MOISTURE 10's place     (0-9)
+// CURSOR=3 MOISTURE 1's place      (0-9)
+// CURSOR=4 MOISTURE sensor toggle  (ON/OFF)
 volatile unsigned int CURSOR = 0;
-state STATE = INIT;
-volatile screens SCREEN = FIRST;
+volatile state STATE = INIT;
+volatile screens SCREEN = TIME;
 #define MAXNODES 30
 unsigned int WATERED = 0;
-unsigned int MOISTURE[MAXNODES]; // ADC Sampling put in this Variable
-unsigned int TEMPERATURE[MAXNODES]; // ADC Sampling put in this Variable
-unsigned int MOISTURE_DONE = 0; // This is to make sure Moisture only gets 48 samples
-unsigned int TEMPERATURE_DONE = 0; // This is to make sure Temperature only gets 48 samples
+unsigned int WATERING = 0;
+volatile unsigned int MOISTURE[MAXNODES]; // ADC Sampling put in this Variable
+volatile unsigned int TEMPERATURE[MAXNODES]; // ADC Sampling put in this Variable
+volatile unsigned int MOISTURE_DONE = 0; // This is to make sure Moisture only gets 48 samples
+volatile unsigned int TEMPERATURE_DONE = 0; // This is to make sure Temperature only gets 48 samples
 unsigned int mSampleIdx = 0; // This is the moisture sample index for the ADC12_ISR.
 unsigned int tSampleIdx = 0; // This is the temperature sample index for the ADC12_ISR.
 volatile unsigned int TEMP_STATUS = 1; // This is used to determine if temperature sensor is on or off.
 volatile unsigned int MOIST_STATUS = 1; // This is used to determine if moisture sensor is on or off.
-volatile READ_RESULT CURR_TEMP_MOIST; // This holds average of sampling and value to be displayed
+READ_RESULT CURR_TEMP_MOIST; // This holds average of sampling and value to be displayed
 volatile READ_RESULT USR_TEMP_MOIST; // Set this to the user's desired moisture and temperature
-volatile RUN_RESULT PREV_RESULTS[MAXNODES]; //TODO Set this up for the deterministic algorithm
+RUN_RESULT PREV_RESULTS[MAXNODES]; //TODO Set this up for the deterministic algorithm
 volatile time CURR_TIME;
-unsigned int firstScreen [];
-unsigned int timeScreen [];
-unsigned int moistScreen [];
-unsigned int tempScreen [];
 #endif /* MAIN_H_ */

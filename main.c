@@ -6,19 +6,6 @@
 // Kendal Zimmer
 #include "main.h"
 // ========================= INIT BLOCK ===========================
-void init(void) {
-    volatile unsigned int minute, hour, temperature_threshold, moisture_threshold;
-    SCREEN = FIRST;
-    display();
-    //TODO Get all the Initial Values before the system will even begin.
-    CURR_TIME.hourOne;
-    CURR_TIME.hourTen;
-    CURR_TIME.minOne;
-    CURR_TIME.minTen;
-    USR_TEMP_MOIST.moisture = moisture_threshold;
-    USR_TEMP_MOIST.temperature = temperature_threshold;
-    STATE = POLLING;
-}
 
 void RTC_INIT(void) {
     CSCTL0_H = CSKEY >> 8;
@@ -31,11 +18,20 @@ void RTC_INIT(void) {
     // Configure the RTC
     RTCCTL0_H = RTCKEY_H;
     RTCCTL0_L = RTCTEVIE | RTCAIE;
-    RTCCTL1 =  RTCHOLD | RTCMODE;
+    RTCCTL1 =  RTCHOLD | RTCMODE | RTCTEV_1;
     RTCHOUR = (CURR_TIME.hourTen * 10) + CURR_TIME.hourOne;
     RTCMIN = (CURR_TIME.minTen * 10) + CURR_TIME.minOne;
     RTCAMIN = 30 | RTCAE;
+    RTCCTL0_H = 0;
 }
+
+void RTC_UPDATE(void) {
+    RTCCTL0_H = RTCKEY_H;
+    RTCHOUR = (CURR_TIME.hourTen * 10) + CURR_TIME.hourOne;
+    RTCMIN = (CURR_TIME.minTen * 10) + CURR_TIME.minOne;
+    RTCCTL0_H = 0;
+}
+
 // ========================= HELPER BLOCK =========================
 
 //TODO Implement this
@@ -51,6 +47,7 @@ void valveOpen(void) {
     __delay_cycles(6000000);
     P2OUT &= ~BIT5;
     WATERED = 1;
+    WATERING = 1;
 }
 
 /*
@@ -60,6 +57,7 @@ void valveClose(void) {
     P3OUT |= BIT2;
     __delay_cycles(6000000);
     P3OUT &= ~BIT2;
+    WATERING = 0;
 }
 
 // ========================= GPIO BLOCK =========================
@@ -70,26 +68,37 @@ void valveClose(void) {
 void GPIO_INIT(void) {
     // Clear all floating for power consumption
     P1DIR = 0xFF;
+    P1REN = 0xFF;
     P1OUT = 0;
     P2DIR = 0xFF;
+    P2REN = 0xFF;
     P2OUT = 0;
     P3DIR = 0xFF;
+    P3REN = 0xFF;
     P3OUT = 0;
     P4DIR = 0xFF;
+    P4REN = 0xFF;
     P4OUT = 0;
     P5DIR = 0xFF;
+    P5REN = 0xFF;
     P5OUT = 0;
     P6DIR = 0xFF;
+    P6REN = 0xFF;
     P6OUT = 0;
     P7DIR = 0xFF;
+    P7REN = 0xFF;
     P7OUT = 0;
     P8DIR = 0xFF;
+    P8REN = 0xFF;
     P8OUT = 0;
     P9DIR = 0xFF;
+    P9REN = 0xFF;
     P9OUT = 0;
     P10DIR = 0xFF;
+    P10REN = 0xFF;
     P10OUT = 0;
     PJDIR = 0xFF;
+    PJREN = 0xFF;
     PJOUT = 0;
     // Sensor Outputs:
     // P2.0 is moisture_enable
@@ -104,24 +113,15 @@ void GPIO_INIT(void) {
     // P2.5 is Down
     // P2.7 is SEL
     // P4.7 is Back
-    P1REN = BIT5;
     P1DIR &= ~ BIT5;
     P1OUT &= ~BIT5;
-    P1IE = BIT5;
     P1IES = BIT5;
-    P1IFG = 0;
     P2DIR &= ~ BIT4|BIT5|BIT7;
-    P2REN = BIT4|BIT5|BIT7;
     P2OUT &= ~BIT4|BIT5|BIT7;
-    P2IE = BIT4|BIT5|BIT7;
     P2IES = BIT4|BIT5|BIT7;
-    P2IFG = 0;
     P4DIR &= ~ BIT7;
-    P4REN = BIT7;
     P4OUT &= ~BIT7;
-    P4IE = BIT7;
     P4IES = BIT7;
-    P4IFG = 0;
     // Configuring P9.2 and 9.3 for ADC input sampling.
     P9DIR &= ~ BIT1|BIT2;
     P9SEL1 |= BIT1|BIT2;
@@ -130,6 +130,12 @@ void GPIO_INIT(void) {
     PJSEL0 = BIT4|BIT5;
     // Disable GPIO power-on default high-impedance.
     PM5CTL0 &= ~LOCKLPM5;
+    P1IFG = 0;
+    P2IFG = 0;
+    P4IFG = 0;
+    P1IE = BIT5;
+    P2IE = BIT4|BIT5|BIT7;
+    P4IE = BIT7;
 }
 
 
@@ -151,12 +157,20 @@ void ADC_INIT(void) {
 }
 
 void runADC(void) {
+    int ii;
+    unsigned int tempM, tempT;
     if (TEMP_STATUS || MOIST_STATUS) {
         do {
             ADC12CTL0 |= ADC12SC;
             __bis_SR_register(LPM3_bits + GIE);
             __no_operation();
         } while (TEMPERATURE_DONE == 0 && MOISTURE_DONE == 0);
+        for (ii = 29; ii >= 0; ii--) {
+            tempM += MOISTURE[ii];
+            tempT += TEMPERATURE[ii];
+        }
+        CURR_TEMP_MOIST.moisture = ((tempM/30) * 0.1);
+        CURR_TEMP_MOIST.temperature = ((tempT/30 - 93) * 0.0538);
         __no_operation();
     }
 }
@@ -217,136 +231,132 @@ void TIMER_INIT(void) {
     hd44780_clear_screen();
 }
 
-void timeDisplay(void){
-    uint16_t testCURR_TIMEhourTen = 2;
-    uint16_t testCURR_TIMEhourOne = 4;
-    uint16_t testCURR_TIMEminTen = 5;
-    uint16_t testCURR_TIMEminOne = 9;
-    char* waterToggle = "ON";
+void timeDisplay(void) {
     hd44780_write_string("    TIME",1,1,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testCURR_TIMEhourTen,2,1,9,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testCURR_TIMEhourOne,2,1,10,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(CURR_TIME.hourTen,2,1,9,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(CURR_TIME.hourOne,2,1,10,NO_CR_LF);
     hd44780_write_string(" ",1,11,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testCURR_TIMEminTen,2,1,12,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testCURR_TIMEminOne,2,1,13,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(CURR_TIME.minTen,2,1,12,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(CURR_TIME.minOne,2,1,13,NO_CR_LF);
     hd44780_write_string("   ",1,14,NO_CR_LF);
-    hd44780_write_string("    WATER",2,1,NO_CR_LF);
-    hd44780_write_string(waterToggle,2,11,NO_CR_LF);
-    hd44780_write_string("    ",2,13,NO_CR_LF);
+    hd44780_write_string("    WATER ",2,1,NO_CR_LF);
+    if (WATERING) hd44780_write_string("ON ",2,11,NO_CR_LF);
+    else if (!WATERING) hd44780_write_string("OFF",2,11,NO_CR_LF);
+    hd44780_write_string("   ",2,14,NO_CR_LF);
     __no_operation();
     __bis_SR_register(GIE);
 }
 
-void timeDisplayFlash(void){
-    uint16_t testCURR_TIMEhourTen = 2;
-    uint16_t testCURR_TIMEhourOne = 4;
-    uint16_t testCURR_TIMEminTen = 5;
-    uint16_t testCURR_TIMEminOne = 9;
-    char* waterToggle = "ON";
+void timeDisplayFlash(void) {
     if (CURSOR == 1){
         hd44780_write_string(" ",1,9,NO_CR_LF);
-        __delay_cycles(300000);
-        hd44780_output_unsigned_16bit_value(testCURR_TIMEhourTen,2,1,9,NO_CR_LF);
-        __delay_cycles(300000);
+        delay();
+        hd44780_output_unsigned_16bit_value(CURR_TIME.hourTen,2,1,9,NO_CR_LF);
+        delay();
     }
     else if (CURSOR == 2){
         hd44780_write_string(" ",1,10,NO_CR_LF);
-        __delay_cycles(300000);
-        hd44780_output_unsigned_16bit_value(testCURR_TIMEhourOne,2,1,10,NO_CR_LF);
-        __delay_cycles(300000);
+        delay();
+        hd44780_output_unsigned_16bit_value(CURR_TIME.hourOne,2,1,10,NO_CR_LF);
+        delay();
     }
     else if (CURSOR == 3){
         hd44780_write_string(" ",1,12,NO_CR_LF);
-         __delay_cycles(300000);
-        hd44780_output_unsigned_16bit_value(testCURR_TIMEminTen,2,1,12,NO_CR_LF);
-        __delay_cycles(300000);
+        delay();
+        hd44780_output_unsigned_16bit_value(CURR_TIME.minTen,2,1,12,NO_CR_LF);
+        delay();
     }
     else if (CURSOR == 4){
         hd44780_write_string(" ",1,13,NO_CR_LF);
-        __delay_cycles(300000);
-        hd44780_output_unsigned_16bit_value(testCURR_TIMEminOne,2,1,13,NO_CR_LF);
-        __delay_cycles(300000);
+        delay();
+        hd44780_output_unsigned_16bit_value(CURR_TIME.minOne,2,1,13,NO_CR_LF);
+        delay();
     }
     else if (CURSOR == 5){
         hd44780_write_string("   ",2,11,NO_CR_LF);
-        __delay_cycles(300000);
-        hd44780_write_string(waterToggle,2,11,NO_CR_LF);
-        __delay_cycles(300000);
+        delay();
+        if (WATERING) hd44780_write_string("ON ",2,11,NO_CR_LF);
+        else if (!WATERING) hd44780_write_string("OFF",2,11,NO_CR_LF);
+        delay();
     }
 }
-void tempDisplay(void){
-    double doubletestSetTemp10 = 5.6;
-    uint16_t testSetTemp10 = doubletestSetTemp10;
-    uint16_t testSetTemp1 = 0;
-    uint16_t testCurTemp10 = 8;
-    uint16_t testCurTemp1 = 1;
-    uint16_t testCURR_TIMEhourTen = 2;
-    uint16_t testCURR_TIMEhourOne = 4;
-    uint16_t testCURR_TIMEminTen = 5;
-    uint16_t testCURR_TIMEminOne = 9;
-    char* plusOrMinus = "-";
-    char* TEMP_STATUS = "OFF";
+
+void tempDisplay(void) {
+    int utemp, utemp10, utemp1;
+    int ctemp, ctemp10, ctemp1;
+    utemp = USR_TEMP_MOIST.temperature;
+    utemp10 = utemp / 10;
+    utemp1 = utemp % 10;
+    ctemp = CURR_TEMP_MOIST.temperature;
+    ctemp10 = ctemp / 10;
+    ctemp1 = ctemp % 10;
 
     //First Row
-    hd44780_write_string("TEMP SET+",1,1,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testSetTemp10,2,1,10,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testSetTemp1,2,1,11,NO_CR_LF);
+    hd44780_write_string("TEMP SET",1,1,NO_CR_LF);
+    hd44780_write_string("+",1,9,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(utemp10,2,1,10,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(utemp1,2,1,11,NO_CR_LF);
     hd44780_write_string("C ",1,12,NO_CR_LF);
-    hd44780_write_string(TEMP_STATUS,1,14,NO_CR_LF);
+    if (TEMP_STATUS) hd44780_write_string("ON ",1,14,NO_CR_LF);
+    else if (TEMP_STATUS == 0) hd44780_write_string("OFF",1,14,NO_CR_LF);
 
     //Second Row
     hd44780_write_string("CUR",2,1,NO_CR_LF);
-    hd44780_write_string(plusOrMinus,2,4,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testCurTemp10,2,2,5,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testCurTemp1,2,2,6,NO_CR_LF);
+    if (ctemp < 0) hd44780_write_string("-",2,4,NO_CR_LF);
+    else if (ctemp >= 0) hd44780_write_string("+",2,4,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(ctemp10,2,2,5,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(ctemp1,2,2,6,NO_CR_LF);
     hd44780_write_string("C TIME",2,7,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testCURR_TIMEhourTen,2,2,13,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testCURR_TIMEhourOne,2,2,14,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testCURR_TIMEminTen,2,2,15,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testCURR_TIMEminOne,2,2,16,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(CURR_TIME.hourTen,2,2,13,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(CURR_TIME.hourOne,2,2,14,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(CURR_TIME.minTen,2,2,15,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(CURR_TIME.minOne,2,2,16,NO_CR_LF);
     __no_operation();
     __bis_SR_register(GIE);
 }
-void tempDisplayFlash(void){
-    uint16_t testSetTemp10 = 9;
-    uint16_t testSetTemp1 = 0;
+
+void tempDisplayFlash(void) {
+    unsigned int utemp, utemp10, utemp1;
+    utemp = USR_TEMP_MOIST.temperature;
+    utemp10 = utemp / 10;
+    utemp1 = utemp % 10;
     char* TEMP_STATUS = "OFF";
-    if (CURSOR == 1){
-        hd44780_write_string(" ",1,9,NO_CR_LF);
-        __delay_cycles(300000);
-        hd44780_output_unsigned_16bit_value(testSetTemp10,2,1,10,NO_CR_LF);
-        __delay_cycles(300000);
-    }
-    else if (CURSOR == 2){
+    if (CURSOR == 1) {
         hd44780_write_string(" ",1,10,NO_CR_LF);
-        __delay_cycles(300000);
-        hd44780_output_unsigned_16bit_value(testSetTemp1,2,1,11,NO_CR_LF);
-        __delay_cycles(300000);
+        delay();
+        hd44780_output_unsigned_16bit_value(utemp10,2,1,10,NO_CR_LF);
+        hd44780_output_unsigned_16bit_value(utemp1,2,1,11,NO_CR_LF);
+        delay();
     }
-    else if (CURSOR == 3){
+    else if (CURSOR == 2) {
+        hd44780_write_string(" ",1,11,NO_CR_LF);
+        delay();
+        hd44780_output_unsigned_16bit_value(utemp10,2,1,10,NO_CR_LF);
+        hd44780_output_unsigned_16bit_value(utemp1,2,1,11,NO_CR_LF);
+        delay();
+    }
+    else if (CURSOR == 3) {
         hd44780_write_string("   ",1,14,NO_CR_LF);
-         __delay_cycles(300000);
-         hd44780_write_string(TEMP_STATUS,1,14,NO_CR_LF);
-        __delay_cycles(300000);
+        delay();
+        if (TEMP_STATUS) hd44780_write_string("ON ",1,14,NO_CR_LF);
+        else if (TEMP_STATUS == 0) hd44780_write_string("OFF",1,14,NO_CR_LF);
+        delay();
     }
 }
 
-void moisDisplay(void){
-    unsigned int umois;
-    unsigned int umois100;
-    unsigned int umois10;
-    unsigned int umois1;
+void moisDisplay(void) {
+    unsigned int umois, cmois;
+    unsigned int umois100, cmois100;
+    unsigned int umois10, cmois10;
+    unsigned int umois1, cmois1;
     umois = USR_TEMP_MOIST.moisture;
     umois100 = umois / 100;
     umois10 = (umois % 100) / 10;
     umois1 = umois % 10;
-    uint16_t testCurMois100 = 0;
-    uint16_t testCurMois10 = 5;
-    uint16_t testCurMois1 = 6;
-    uint16_t testCURR_TIMEhourTen = 2;
-    uint16_t testCURR_TIMEhourOne = 3;
-    uint16_t testCURR_TIMEminTen = 5;
-    uint16_t testCURR_TIMEminOne = 9;
+    cmois = CURR_TEMP_MOIST.moisture;
+    cmois100 = cmois / 100;
+    cmois10 = (cmois % 100) / 10;
+    cmois1 = cmois % 10;
 
     //First Row
     hd44780_write_string("MOIS SET",1,1,NO_CR_LF);
@@ -354,24 +364,29 @@ void moisDisplay(void){
     hd44780_output_unsigned_16bit_value(umois10,2,1,10,NO_CR_LF);
     hd44780_output_unsigned_16bit_value(umois1,2,1,11,NO_CR_LF);
     hd44780_write_string("% ",1,12,NO_CR_LF);
-    if (MOIST_STATUS == 1) hd44780_write_string("ON",1,14,NO_CR_LF);
+    if (MOIST_STATUS == 1) hd44780_write_string("ON ",1,14,NO_CR_LF);
     else if (MOIST_STATUS == 0) hd44780_write_string("OFF",1,14,NO_CR_LF);
 
     //Second Row
     hd44780_write_string("CUR",2,1,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testCurMois100,2,2,4,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testCurMois10,2,2,5,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testCurMois1,2,2,6,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(cmois100,2,2,4,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(cmois10,2,2,5,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(cmois1,2,2,6,NO_CR_LF);
     hd44780_write_string("% TIME",2,7,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testCURR_TIMEhourTen,2,2,13,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testCURR_TIMEhourOne,2,2,14,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testCURR_TIMEminTen,2,2,15,NO_CR_LF);
-    hd44780_output_unsigned_16bit_value(testCURR_TIMEminOne,2,2,16,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(CURR_TIME.hourTen,2,2,13,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(CURR_TIME.hourOne,2,2,14,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(CURR_TIME.minTen,2,2,15,NO_CR_LF);
+    hd44780_output_unsigned_16bit_value(CURR_TIME.minOne,2,2,16,NO_CR_LF);
     __no_operation();
     __bis_SR_register(GIE);
 }
 
-void moisDisplayFlash(void){
+void delay(void) {
+    if (SEL == 1) __delay_cycles(300000);
+    else if (SEL == 2) __delay_cycles(100000);
+}
+
+void moisDisplayFlash(void) {
     unsigned int mois;
     unsigned int mois100;
     unsigned int mois10;
@@ -381,38 +396,41 @@ void moisDisplayFlash(void){
     mois10 = (mois % 100) / 10;
     mois1 = mois % 10;
     char* moisToggle = "OFF";
-    if (CURSOR == 1){
+    if (CURSOR == 1) {
         hd44780_write_string(" ",1,9,NO_CR_LF);
-        __delay_cycles(300000);
+        delay();
         hd44780_output_unsigned_16bit_value(mois100,2,1,9,NO_CR_LF);
-        __delay_cycles(300000);
-    }
-    else if (CURSOR == 2){
-        hd44780_write_string(" ",1,10,NO_CR_LF);
-        __delay_cycles(300000);
         hd44780_output_unsigned_16bit_value(mois10,2,1,10,NO_CR_LF);
-        __delay_cycles(300000);
-    }
-    else if (CURSOR == 3){
-        hd44780_write_string(" ",1,11,NO_CR_LF);
-        __delay_cycles(300000);
         hd44780_output_unsigned_16bit_value(mois1,2,1,11,NO_CR_LF);
-        __delay_cycles(300000);
+        delay();
+    }
+    else if (CURSOR == 2) {
+        hd44780_write_string(" ",1,10,NO_CR_LF);
+        delay();
+        hd44780_output_unsigned_16bit_value(mois100,2,1,9,NO_CR_LF);
+        hd44780_output_unsigned_16bit_value(mois10,2,1,10,NO_CR_LF);
+        hd44780_output_unsigned_16bit_value(mois1,2,1,11,NO_CR_LF);
+        delay();
+    }
+    else if (CURSOR == 3) {
+        hd44780_write_string(" ",1,11,NO_CR_LF);
+        delay();
+        hd44780_output_unsigned_16bit_value(mois100,2,1,9,NO_CR_LF);
+        hd44780_output_unsigned_16bit_value(mois10,2,1,10,NO_CR_LF);
+        hd44780_output_unsigned_16bit_value(mois1,2,1,11,NO_CR_LF);
+        delay();
     }
     else if (CURSOR == 4){
         hd44780_write_string("   ",1,14,NO_CR_LF);
-         __delay_cycles(300000);
-         hd44780_write_string(moisToggle,1,14,NO_CR_LF);
-        __delay_cycles(300000);
+        delay();
+        if (MOIST_STATUS == 1) hd44780_write_string("ON ",1,14,NO_CR_LF);
+        else if (MOIST_STATUS == 0) hd44780_write_string("OFF",1,14,NO_CR_LF);
+        delay();
     }
 }
 
 void display(void) {
-
-    if (SCREEN == FIRST) {
-        SCREEN = MOIS; //Current screen that is being tested
-        moisDisplay(); //Prints screen once in case you are flashing a part and haven't initialized the screen
-    } else if (SCREEN == TIME) {
+    if (SCREEN == TIME) {
         if(CURSOR != 0){
             timeDisplayFlash();
         }
@@ -437,16 +455,13 @@ void display(void) {
 }
 
 void main(void) {
-    volatile unsigned int temp;
     // Disable Watchdog Timer while Initializing.
-
     WDTCTL = WDTPW | WDTHOLD;
     // Initialize on startup
     GPIO_INIT();
     ADC_INIT();
     TIMER_INIT();
     RTC_INIT();
-    SCREEN = FIRST;
     while(1) {
         display();
         //stateCheck();
@@ -464,13 +479,6 @@ __interrupt
 void ADC12_ISR(void) {
     volatile unsigned int tRes, mRes, ii;
     switch(__even_in_range(ADC12IV,12)) {
-    case  0: break;                     // Vector  0:  No interrupt
-    case  2: break;                     // Vector  2:  ADC12BMEMx Overflow
-    case  4: break;                     // Vector  4:  Conversion time overflow
-    case  6: break;                     // Vector  6:  ADC12BHI
-    case  8: break;                     // Vector  8:  ADC12BLO
-    case 10: break;                     // Vector 10:  ADC12BIN
-    case 12:                            // Vector 12:  ADC12BMEM0
     case 14:                            // Vector 14:  ADC12BMEM1
         if (TEMP_STATUS) {
             if (TEMPERATURE_DONE == 0) {
@@ -478,10 +486,6 @@ void ADC12_ISR(void) {
                 if (tSampleIdx == 29) {
                     TEMPERATURE_DONE = 1;
                     tSampleIdx = 0;
-                    for (ii = 29; ii > 0; ii--) {
-                        tRes += TEMPERATURE[ii];
-                    }
-                    CURR_TEMP_MOIST.temperature = (((tRes/29) * 0.0033) / 0.06);
                     __no_operation();
                 } else {
                     TEMPERATURE[tSampleIdx] = tRes;
@@ -496,10 +500,6 @@ void ADC12_ISR(void) {
                 if (mSampleIdx == 29) {
                     MOISTURE_DONE = 1;
                     mSampleIdx = 0;
-                    for (ii = 29; ii > 0; ii--) {
-                        mRes += MOISTURE[ii];
-                    }
-                    CURR_TEMP_MOIST.moisture = (((mRes/29) * 0.0033) / 0.033);
                     __no_operation();
                 } else {
                     MOISTURE[mSampleIdx] = mRes;
@@ -531,8 +531,12 @@ __interrupt
  * The Interrupt Handler for Port 1
  */
 void Port_1(void) {
-    //SEL = 0;
-    P1IFG &= ~BIT5;
+    SEL = 0;
+    CURSOR = 0;
+    STATE = SLEEP;
+    SCREEN = TIME;
+    P1IFG = 0;
+    __delay_cycles(80000);
 }
 
 #pragma vector = PORT2_VECTOR
@@ -601,7 +605,6 @@ void Port_2(void) {
             else if (SCREEN == TEMP) SCREEN = TIME;
             else if (SCREEN == MOIS) SCREEN = TEMP;
         }
-        P2IFG = 0;
     } else if (P2IFG & BIT5) { // DOWN
         if (SEL == 1) { // In Screen
             if (SCREEN == TIME && CURSOR != 5) CURSOR++;
@@ -664,11 +667,14 @@ void Port_2(void) {
         P2IFG = 0;
     } else if (P2IFG & BIT7) { // SELECT
         if (SEL == 1) SEL = 2;
-        else if (SEL == 0) SEL = 1;
+        else if (SEL == 0) {
+            CURSOR = 1;
+            SEL = 1;
+        }
         else SEL = 2;
-        P2IFG = 0;
     }
-
+    P2IFG = 0;
+    __delay_cycles(80000);
 }
 
 #pragma vector = PORT4_VECTOR
@@ -678,8 +684,12 @@ __interrupt
  * The Interrupt Handler for Port 4
  */
 void Port_4(void) {
-    //if (SEL != 0) SEL--;
+    if (SEL != 0) {
+        if (SEL == 1) CURSOR = 0;
+        SEL--;
+    }
     P4IFG &= ~BIT7;
+    __delay_cycles(80000);
 }
 
 
