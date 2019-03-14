@@ -14,9 +14,18 @@
 // Helper Block
 void delay(void);
 void display(void);
-void STATE_CHECK(void);
-void currToUsrCompare(void); //TODO occurs after ADC has generated a new average value, comparing to the user's value
+void timeDisplay(void);
+void timeDisplayFlash(void);
+void tempDisplay(void);
+void tempDisplayFlash(void);
+void moisDisplay(void);
+void moisDisplayFlash(void);
+void stateCheck(void);
+void enableSensors(void);
+void disableSensors(void);
+void currToUsrCompare(void);
 void valveOpen(void); //This controls the valve being open and receives the valve response
+void valveClose(void);
 // Math Block
 int flowRate(void); //TODO This will be the algorithm to determine water absorption
 int timeCheck(void); //TODO This will utilize the RTC for time-checking
@@ -82,20 +91,20 @@ volatile unsigned int SEL = 0;
 // CURSOR=3 MOISTURE 1's place      (0-9)
 // CURSOR=4 MOISTURE sensor toggle  (ON/OFF)
 volatile unsigned int CURSOR = 0;
-volatile state STATE = INIT;
+volatile state STATE = POLLING;
 volatile screens SCREEN = TIME;
 #define MAXNODES 30
-unsigned int WATERED = 0;
-unsigned int WATERING = 0;
-volatile unsigned int MOISTURE[MAXNODES]; // ADC Sampling put in this Variable
-volatile unsigned int TEMPERATURE[MAXNODES]; // ADC Sampling put in this Variable
+volatile unsigned int WATERED = 0;
+volatile unsigned int WATERING = 0;
+volatile int MOISTURE[MAXNODES]; // ADC Sampling put in this Variable
+volatile int TEMPERATURE[MAXNODES]; // ADC Sampling put in this Variable
 volatile unsigned int MOISTURE_DONE = 0; // This is to make sure Moisture only gets 48 samples
 volatile unsigned int TEMPERATURE_DONE = 0; // This is to make sure Temperature only gets 48 samples
-unsigned int mSampleIdx = 0; // This is the moisture sample index for the ADC12_ISR.
-unsigned int tSampleIdx = 0; // This is the temperature sample index for the ADC12_ISR.
+volatile unsigned int mSampleIdx = 0; // This is the moisture sample index for the ADC12_ISR.
+volatile unsigned int tSampleIdx = 0; // This is the temperature sample index for the ADC12_ISR.
 volatile unsigned int TEMP_STATUS = 1; // This is used to determine if temperature sensor is on or off.
 volatile unsigned int MOIST_STATUS = 1; // This is used to determine if moisture sensor is on or off.
-READ_RESULT CURR_TEMP_MOIST; // This holds average of sampling and value to be displayed
+volatile READ_RESULT CURR_TEMP_MOIST; // This holds average of sampling and value to be displayed
 volatile READ_RESULT USR_TEMP_MOIST; // Set this to the user's desired moisture and temperature
 RUN_RESULT PREV_RESULTS[MAXNODES]; //TODO Set this up for the deterministic algorithm
 volatile time CURR_TIME;
