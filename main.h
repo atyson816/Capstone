@@ -38,7 +38,7 @@ void ADC_CTRL(void);
 void main(void);
 
 // Global Type Def's
-typedef enum {INIT, SLEEP, POLLING, RUNNING} state;
+typedef enum {SLEEP, POLLING, RUNNING} state;
 typedef enum {TIME, TEMP, MOIS} screens;
 
 typedef struct {
@@ -91,9 +91,10 @@ volatile unsigned int SEL = 0;
 // CURSOR=3 MOISTURE 1's place      (0-9)
 // CURSOR=4 MOISTURE sensor toggle  (ON/OFF)
 volatile unsigned int CURSOR = 0;
-volatile state STATE = POLLING;
+volatile state STATE = SLEEP;
 volatile screens SCREEN = TIME;
 #define MAXNODES 30
+volatile unsigned int MASTEROVERRIDE = 0;
 volatile unsigned int WATERED = 0;
 volatile unsigned int WATERING = 0;
 volatile int MOISTURE[MAXNODES]; // ADC Sampling put in this Variable

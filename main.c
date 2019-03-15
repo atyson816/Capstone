@@ -45,21 +45,23 @@ void GPIO_INIT(void) {
     // P4.7 is Back
     P1DIR &= ~ BIT5;
     P1REN = BIT5;
-    P1OUT &= ~BIT5;
+    P1OUT |= BIT5;
     P1IE = BIT5;
-    P1IES = BIT5;
+    P1IES &= ~BIT5;
     P2DIR &= ~ BIT4|BIT5|BIT7;
     P2REN = BIT4|BIT5|BIT7;
     P2OUT &= ~BIT4|BIT5|BIT7;
+    P2OUT |= BIT4|BIT5|BIT7;
     P2IE = BIT4|BIT5|BIT7;
-    P2IES = BIT4|BIT5|BIT7;
+    P2IES &= ~BIT4|BIT5|BIT7;
     P4DIR &= ~ BIT7;
     P4REN = BIT7;
     P4OUT &= ~BIT7;
+    P4OUT |= BIT7;
     P4IE = BIT7;
-    P4IES = BIT7;
+    P4IES &= ~BIT7;
     // Configuring P9.2 and 9.3 for ADC input sampling.
-    P9DIR &= ~ BIT2|BIT3;
+    P9DIR &= ~BIT2|BIT3;
     P9SEL1 |= BIT2|BIT3;
     P9SEL0 |= BIT2|BIT3;
     PJDIR &= ~BIT4|BIT5;
@@ -99,10 +101,15 @@ void RTC_INIT(void) {
         SFRIFG1 &= ~OFIFG;
     } while (SFRIFG1 & OFIFG);
     CSCTL0_H = 0;
+    CURR_TIME.hourTen = 0;
+    CURR_TIME.hourOne = 0;
+    CURR_TIME.minOne = 0;
+    CURR_TIME.minTen = 0;
     // Configure the RTC
     RTCCTL0_H = RTCKEY_H;
     RTCCTL0_L = RTCTEVIE | RTCAIE;
-    RTCCTL1 =  RTCHOLD | RTCMODE | RTCTEV_1;
+    RTCCTL0 &= ~RTCRDYIFG;
+    RTCCTL1 =  RTCHOLD | RTCMODE | RTCTEV_0;
     RTCHOUR = (CURR_TIME.hourTen * 10) + CURR_TIME.hourOne;
     RTCMIN = (CURR_TIME.minTen * 10) + CURR_TIME.minOne;
     RTCAMIN = 30 | RTCAE;
@@ -118,37 +125,39 @@ void RTC_UPDATE(void) {
 
 // ======================== CONTROL BLOCK =========================
 void currToUsrCompare(void) {
-    if (WATERED == 0) {
-        if (CURR_TEMP_MOIST.moisture < USR_TEMP_MOIST.moisture) {
-            STATE = RUNNING;
-        } else if (CURR_TEMP_MOIST.temperature < USR_TEMP_MOIST.temperature) {
-            STATE = RUNNING;
-        } else if (STATE == RUNNING) {
-            valveClose();
-            disableSensors();
-            STATE = SLEEP;
+    if (MASTEROVERRIDE == 0) {
+        if (WATERED == 0) {
+            if (CURR_TEMP_MOIST.moisture < USR_TEMP_MOIST.moisture) {
+                STATE = RUNNING;
+            } else if (CURR_TEMP_MOIST.temperature < USR_TEMP_MOIST.temperature) {
+                STATE = RUNNING;
+            } else if (STATE == RUNNING) {
+                valveClose();
+                disableSensors();
+                STATE = SLEEP;
+            } else {
+                disableSensors();
+                STATE = SLEEP;
+            }
         } else {
-            disableSensors();
             STATE = SLEEP;
         }
-    } else {
-        STATE = SLEEP;
     }
 }
 
 void valveOpen(void) {
-    P3OUT |= BIT2;
-    __delay_cycles(6000000);
-    P3OUT &= ~BIT2;
     WATERED = 1;
     WATERING = 1;
-}
-
-void valveClose(void) {
     P9OUT |= BIT4;
     __delay_cycles(6000000);
     P9OUT &= ~BIT4;
+}
+
+void valveClose(void) {
     WATERING = 0;
+    P3OUT |= BIT2;
+    __delay_cycles(6000000);
+    P3OUT &= ~BIT2;
 }
 
 void runADC(void) {
@@ -194,7 +203,6 @@ void disableSensors(void) {
 void stateCheck(void) {
     if (STATE == SLEEP) {
         display();
-        __bis_SR_register(LPM2_bits + GIE);
         __no_operation();
     } else if (STATE == POLLING) {
         enableSensors();
@@ -203,6 +211,7 @@ void stateCheck(void) {
         currToUsrCompare();
     }  else if (STATE == RUNNING) {
         valveOpen();
+        enableSensors();
         runADC();
         display();
         currToUsrCompare();
@@ -242,10 +251,10 @@ void display(void) {
 
 void timeDisplay(void) {
     unsigned int hourTen, hourOne, minTen, minOne;
-    hourTen = RTCHOUR / 10;
-    hourOne = RTCHOUR % 10;
-    minTen = RTCMIN / 10;
-    minOne = RTCMIN % 10;
+    hourTen = CURR_TIME.hourTen;
+    hourOne = CURR_TIME.hourOne;
+    minTen = CURR_TIME.minTen;
+    minOne = CURR_TIME.minOne;
     hd44780_write_string("    TIME",1,1,NO_CR_LF);
     hd44780_output_unsigned_16bit_value(hourTen,2,1,9,NO_CR_LF);
     hd44780_output_unsigned_16bit_value(hourOne,2,1,10,NO_CR_LF);
@@ -254,8 +263,8 @@ void timeDisplay(void) {
     hd44780_output_unsigned_16bit_value(minOne,2,1,13,NO_CR_LF);
     hd44780_write_string("   ",1,14,NO_CR_LF);
     hd44780_write_string("    WATER ",2,1,NO_CR_LF);
-    if (WATERING) hd44780_write_string("ON ",2,11,NO_CR_LF);
-    else if (!WATERING) hd44780_write_string("OFF",2,11,NO_CR_LF);
+    if (WATERING == 1) hd44780_write_string("ON ",2,11,NO_CR_LF);
+    else if (WATERING == 0) hd44780_write_string("OFF",2,11,NO_CR_LF);
     hd44780_write_string("   ",2,14,NO_CR_LF);
     __no_operation();
     __bis_SR_register(GIE);
@@ -263,10 +272,10 @@ void timeDisplay(void) {
 
 void timeDisplayFlash(void) {
     unsigned int hourTen, hourOne, minTen, minOne;
-    hourTen = RTCHOUR / 10;
-    hourOne = RTCHOUR % 10;
-    minTen = RTCMIN / 10;
-    minOne = RTCMIN % 10;
+    hourTen = CURR_TIME.hourTen;
+    hourOne = CURR_TIME.hourOne;
+    minTen = CURR_TIME.minTen;
+    minOne = CURR_TIME.minOne;
     if (CURSOR == 1){
         hd44780_write_string(" ",1,9,NO_CR_LF);
         delay();
@@ -294,8 +303,8 @@ void timeDisplayFlash(void) {
     else if (CURSOR == 5){
         hd44780_write_string("   ",2,11,NO_CR_LF);
         delay();
-        if (WATERING) hd44780_write_string("ON ",2,11,NO_CR_LF);
-        else if (!WATERING) hd44780_write_string("OFF",2,11,NO_CR_LF);
+        if (WATERING == 1) hd44780_write_string("ON ",2,11,NO_CR_LF);
+        else if (WATERING == 0) hd44780_write_string("OFF",2,11,NO_CR_LF);
         delay();
     }
 }
@@ -310,11 +319,10 @@ void tempDisplay(void) {
     ctemp = CURR_TEMP_MOIST.temperature;
     ctemp10 = ctemp / 10;
     ctemp1 = ctemp % 10;
-    hourTen = RTCHOUR / 10;
-    hourOne = RTCHOUR % 10;
-    minTen = RTCMIN / 10;
-    minOne = RTCMIN % 10;
-
+    hourTen = CURR_TIME.hourTen;
+    hourOne = CURR_TIME.hourOne;
+    minTen = CURR_TIME.minTen;
+    minOne = CURR_TIME.minOne;
     //First Row
     hd44780_write_string("TEMP SET",1,1,NO_CR_LF);
     hd44780_write_string("+",1,9,NO_CR_LF);
@@ -381,10 +389,10 @@ void moisDisplay(void) {
     cmois100 = cmois / 100;
     cmois10 = (cmois % 100) / 10;
     cmois1 = cmois % 10;
-    hourTen = RTCHOUR / 10;
-    hourOne = RTCHOUR % 10;
-    minTen = RTCMIN / 10;
-    minOne = RTCMIN % 10;
+    hourTen = CURR_TIME.hourTen;
+    hourOne = CURR_TIME.hourOne;
+    minTen = CURR_TIME.minTen;
+    minOne = CURR_TIME.minOne;
 
     //First Row
     hd44780_write_string("MOIS SET",1,1,NO_CR_LF);
@@ -463,10 +471,7 @@ void main(void) {    // Disable Watchdog Timer while Initializing.
     P2IFG = 0;
     P4IFG = 0;
     while(1) {
-        __bis_SR_register(GIE);
-        //display();
-        //stateCheck();
-        //valveOpen();
+        stateCheck();
     }
 }
 
@@ -523,6 +528,7 @@ __interrupt
  */
 void TIMER0_A0_ISR(void) {
     hd44780_timer_isr();
+    __no_operation();
 }
 
 #pragma vector = PORT1_VECTOR
@@ -532,20 +538,19 @@ __interrupt
  * The Interrupt Handler for Port 1
  */
 void Port_1(void) {
+    P1IE = 0;
+    __delay_cycles(100000);
     SEL = 0;
     CURSOR = 0;
-    STATE = SLEEP;
     SCREEN = TIME;
-    P1IFG = 0;
-    if (WATERING) {
-        valveClose();
-        WATERING = 0;
-    }
-    else if (!WATERING) {
+    if (WATERING == 0) {
         valveOpen();
-        WATERING = 1;
+    } else if (WATERING == 1) {
+        valveClose();
     }
-    __delay_cycles(80000);
+    P1IFG = 0;
+    P1IE |= BIT5;
+    __delay_cycles(100000);
 }
 
 #pragma vector = PORT2_VECTOR
@@ -555,7 +560,10 @@ __interrupt
  * The Interrupt Handler for Port 2
  */
 void Port_2(void) {
+    P2IE &= ~BIT4|BIT5|BIT7;
+    __delay_cycles(100000);
     if (P2IFG & BIT4) { // UP
+        P2IFG = 0;
         if (SEL == 1) { // In Screen
             if (CURSOR != 1) CURSOR--;
             else CURSOR = 1;
@@ -575,10 +583,18 @@ void Port_2(void) {
                 else if (CURSOR == 4){
                     if (CURR_TIME.minOne < 9) CURR_TIME.minOne++;
                 }
-                /*else if (CURSOR == 5){
-                    if(waterToggle == "OFF") waterToggle == "ON";
-                    else if (waterToggle == "ON") waterToggle == "OFF";
-                }*/
+                else if (CURSOR == 5){
+                    if (WATERING == 0) {
+                        MASTEROVERRIDE = 1;
+                        STATE = RUNNING;
+                        WATERING = 1;
+                    }
+                    else if (WATERING == 1) {
+                        MASTEROVERRIDE = 0;
+                        STATE = SLEEP;
+                        WATERING = 0;
+                    }
+                }
             }
             else if (SCREEN == TEMP){
                 if (CURSOR == 1){
@@ -615,6 +631,7 @@ void Port_2(void) {
             else if (SCREEN == MOIS) SCREEN = TEMP;
         }
     } else if (P2IFG & BIT5) { // DOWN
+        P2IFG = 0;
         __no_operation();
         if (SEL == 1) { // In Screen
             if (SCREEN == TIME && CURSOR != 5) CURSOR++;
@@ -625,7 +642,7 @@ void Port_2(void) {
             else CURSOR = CURSOR;
         } else if (SEL == 2) { // In Value
             if (SCREEN == TIME){
-                if (CURSOR == 1){
+                if (CURSOR == 1) {
                     if (CURR_TIME.hourTen != 0) CURR_TIME.hourTen--;
                 }
                 else if (CURSOR == 2){
@@ -637,10 +654,18 @@ void Port_2(void) {
                 else if (CURSOR == 4){
                     if(CURR_TIME.minOne != 0) CURR_TIME.minOne--;
                 }
-                /*else if (CURSOR == 5){
-                    if(waterToggle == "OFF") waterToggle == "ON";
-                    else if (waterToggle == "ON") waterToggle == "OFF";
-                }*/
+                else if (CURSOR == 5){
+                    if (WATERING == 1) {
+                        MASTEROVERRIDE = 0;
+                        STATE = SLEEP;
+                        WATERING = 0;
+                    }
+                    else if (WATERING == 0) {
+                        MASTEROVERRIDE = 1;
+                        STATE = RUNNING;
+                        WATERING = 1;
+                    }
+                }
             }
             else if (SCREEN == TEMP){
                 if (CURSOR == 1){
@@ -675,6 +700,7 @@ void Port_2(void) {
             else if (SCREEN == MOIS) SCREEN = TIME;
         }
     } else if (P2IFG & BIT7) { // SELECT
+        P2IFG = 0;
         __no_operation();
         if (SEL == 1) SEL = 2;
         else if (SEL == 0) {
@@ -683,8 +709,9 @@ void Port_2(void) {
         }
         else SEL = 2;
     }
-    P2IFG = 0;
-    __delay_cycles(80000);
+    __delay_cycles(100000);
+    __no_operation();
+    P2IE = BIT4|BIT5|BIT7;
 }
 
 #pragma vector = PORT4_VECTOR
@@ -694,13 +721,13 @@ __interrupt
  * The Interrupt Handler for Port 4
  */
 void Port_4(void) {
-    __no_operation();
+    P4IFG = 0;
+    __delay_cycles(100000);
     if (SEL != 0) {
         if (SEL == 1) CURSOR = 0;
         SEL--;
     }
-    P4IFG &= ~BIT7;
-    __delay_cycles(80000);
+    __delay_cycles(100000);
 }
 
 #pragma vector = RTC_VECTOR
@@ -715,7 +742,7 @@ void RTC_ISR(void) {
         case RTCIV_RTCTEVIFG:
         // Checks to make sure at least 2 hours between watering.
             if (WATERED == 1) {
-                if (count == 2) {
+                if (count == 1) {
                     count = 0;
                     WATERED = 0;
                 } else {
@@ -724,12 +751,13 @@ void RTC_ISR(void) {
             } else if (WATERED == 0) {
                 count = 0;
             }
+            RTC_UPDATE();
             __bis_SR_register_on_exit(LPM3_bits);
             break;
         case RTCIV_RTCAIFG:
         // Every half hour, polls the sensors, if haven't watered in last 2 hours.
             if (WATERED == 0) STATE = POLLING;
-            if ((RTCAMIN & 0x63) == 30) RTCAMIN = 60 | 0x80;
+            if ((RTCAMIN & 0x3F) == 30) RTCAMIN = 60 | 0x80;
             else RTCAMIN = 30 | 0x80;
             __bis_SR_register_on_exit(LPM3_bits);
             break;
