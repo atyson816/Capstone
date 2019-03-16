@@ -2,7 +2,8 @@
  * main.h
  *
  *  Created on: Dec 28, 2018
- *      Author: Austin
+ *      Authors: Austin
+ *             : Ockert
  */
 
 #ifndef MAIN_H_
@@ -27,8 +28,8 @@ void currToUsrCompare(void);
 void valveOpen(void); //This controls the valve being open and receives the valve response
 void valveClose(void);
 // Math Block
-int flowRate(void); //TODO This will be the algorithm to determine water absorption
-int timeCheck(void); //TODO This will utilize the RTC for time-checking
+void flowRate(void); //TODO This will be the algorithm to determine water absorption
+void timeCheck(void); //TODO This will utilize the RTC for time-checking
 // GPIO Block
 void GPIO_INIT(void);
 // ADC Block
@@ -38,7 +39,7 @@ void ADC_CTRL(void);
 void main(void);
 
 // Global Type Def's
-typedef enum {SLEEP, POLLING, RUNNING} state;
+typedef enum {MASTERON, MASTEROFF, SLEEP, POLLING, RUNNING} state;
 typedef enum {TIME, TEMP, MOIS} screens;
 
 typedef struct {
@@ -90,6 +91,7 @@ volatile unsigned int SEL = 0;
 // CURSOR=2 MOISTURE 10's place     (0-9)
 // CURSOR=3 MOISTURE 1's place      (0-9)
 // CURSOR=4 MOISTURE sensor toggle  (ON/OFF)
+unsigned int firstRun = 1;
 volatile unsigned int CURSOR = 0;
 volatile state STATE = SLEEP;
 volatile screens SCREEN = TIME;
@@ -109,4 +111,5 @@ volatile READ_RESULT CURR_TEMP_MOIST; // This holds average of sampling and valu
 volatile READ_RESULT USR_TEMP_MOIST; // Set this to the user's desired moisture and temperature
 RUN_RESULT PREV_RESULTS[MAXNODES]; //TODO Set this up for the deterministic algorithm
 volatile time CURR_TIME;
+volatile unsigned int count = 0;
 #endif /* MAIN_H_ */

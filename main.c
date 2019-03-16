@@ -1,9 +1,11 @@
 // Capstone Design Project
-// Authors:
-// Stefan Heincke
+// Coders:
 // Ockert Strydom
 // Austin Tyson
+// Circuitry:
+// Stefan Heincke
 // Kendal Zimmer
+
 #include "main.h"
 // ========================= INIT BLOCK ===========================
 void GPIO_INIT(void) {
@@ -43,6 +45,8 @@ void GPIO_INIT(void) {
     // P2.5 is Down
     // P2.7 is SEL
     // P4.7 is Back
+    P8SEL1 &= ~BIT4|BIT5;
+    P8SEL0 &= ~BIT4|BIT5;
     P1DIR &= ~ BIT5;
     P1REN = BIT5;
     P1OUT |= BIT5;
@@ -76,12 +80,12 @@ void GPIO_INIT(void) {
 void ADC_INIT(void) {
     ADC12CTL0 &= ~ADC12ENC;
     ADC12CTL0 = ADC12SHT0_8 | ADC12MSC | ADC12ON;
-    ADC12CTL1 = ADC12SSEL_2 | ADC12CONSEQ_3 | ADC12SHP | ADC12PDIV_2 | ADC12DIV_7;
+    ADC12CTL1 = ADC12SSEL_2 | ADC12CONSEQ_3 | ADC12SHP | ADC12PDIV_2 | ADC12DIV_3;
     ADC12CTL2 = ADC12RES_1; //10 bit ADC
     ADC12CTL3 |= ADC12CSTARTADD_0;
     ADC12MCTL0 |= ADC12INCH_10; //9.2
     ADC12MCTL1 |= ADC12INCH_11 | ADC12EOS; //9.3
-    ADC12IFGR0 &= ~ ADC12IFG0|ADC12IFG1;
+    ADC12IFGR0 &= ~ADC12IFG0|ADC12IFG1;
     ADC12IER0 |= ADC12IE1;
     ADC12CTL0 |= ADC12ENC;
 }
@@ -107,12 +111,10 @@ void RTC_INIT(void) {
     CURR_TIME.minTen = 0;
     // Configure the RTC
     RTCCTL0_H = RTCKEY_H;
-    RTCCTL0_L = RTCTEVIE | RTCAIE;
-    RTCCTL0 &= ~RTCRDYIFG;
+    RTCCTL0_L = RTCTEVIE;
     RTCCTL1 =  RTCHOLD | RTCMODE | RTCTEV_0;
     RTCHOUR = (CURR_TIME.hourTen * 10) + CURR_TIME.hourOne;
     RTCMIN = (CURR_TIME.minTen * 10) + CURR_TIME.minOne;
-    RTCAMIN = 30 | RTCAE;
     RTCCTL1 &= ~RTCHOLD;
 }
 
@@ -125,39 +127,44 @@ void RTC_UPDATE(void) {
 
 // ======================== CONTROL BLOCK =========================
 void currToUsrCompare(void) {
-    if (MASTEROVERRIDE == 0) {
-        if (WATERED == 0) {
-            if (CURR_TEMP_MOIST.moisture < USR_TEMP_MOIST.moisture) {
-                STATE = RUNNING;
-            } else if (CURR_TEMP_MOIST.temperature < USR_TEMP_MOIST.temperature) {
-                STATE = RUNNING;
-            } else if (STATE == RUNNING) {
-                valveClose();
-                disableSensors();
-                STATE = SLEEP;
-            } else {
-                disableSensors();
-                STATE = SLEEP;
-            }
+    if (WATERED == 0) {
+        if (CURR_TEMP_MOIST.moisture < USR_TEMP_MOIST.moisture) {
+            STATE = RUNNING;
+        } else if (CURR_TEMP_MOIST.temperature > USR_TEMP_MOIST.temperature) {
+            STATE = RUNNING;
+        } else if (STATE == RUNNING) {
+            valveClose();
+            disableSensors();
+            firstRun = 1;
+            STATE = SLEEP;
         } else {
+            disableSensors();
             STATE = SLEEP;
         }
+    } else {
+        STATE = SLEEP;
     }
 }
 
 void valveOpen(void) {
     WATERED = 1;
     WATERING = 1;
-    P9OUT |= BIT4;
-    __delay_cycles(6000000);
-    P9OUT &= ~BIT4;
+    P8OUT |= BIT4;
+    __delay_cycles(1000000);
+    __delay_cycles(1000000);
+    __delay_cycles(1000000);
+    __delay_cycles(1000000);
+    P8OUT &= ~BIT4;
 }
 
 void valveClose(void) {
     WATERING = 0;
-    P3OUT |= BIT2;
-    __delay_cycles(6000000);
-    P3OUT &= ~BIT2;
+    P8OUT |= BIT5;
+    __delay_cycles(1000000);
+    __delay_cycles(1000000);
+    __delay_cycles(1000000);
+    __delay_cycles(1000000);
+    P8OUT &= ~BIT5;
 }
 
 void runADC(void) {
@@ -201,21 +208,29 @@ void disableSensors(void) {
 }
 
 void stateCheck(void) {
-    if (STATE == SLEEP) {
-        display();
+    if (STATE == MASTERON) {
+        valveOpen();
+        __no_operation();
+    } else if (STATE == MASTEROFF) {
+         valveClose();
+         STATE = SLEEP;
+         __no_operation();
+    } else if (STATE == SLEEP) {
         __no_operation();
     } else if (STATE == POLLING) {
         enableSensors();
         runADC();
-        display();
         currToUsrCompare();
+        __no_operation();
     }  else if (STATE == RUNNING) {
-        valveOpen();
-        enableSensors();
+        if (firstRun) {
+            valveOpen();
+            firstRun = 0;
+        }
         runADC();
-        display();
         currToUsrCompare();
-    }
+        __no_operation();
+    } 
 }
 
 void delay(void) {
@@ -331,7 +346,6 @@ void tempDisplay(void) {
     hd44780_write_string("C ",1,12,NO_CR_LF);
     if (TEMP_STATUS) hd44780_write_string("ON ",1,14,NO_CR_LF);
     else if (TEMP_STATUS == 0) hd44780_write_string("OFF",1,14,NO_CR_LF);
-
     //Second Row
     hd44780_write_string("CUR",2,1,NO_CR_LF);
     if (ctemp < 0) hd44780_write_string("-",2,4,NO_CR_LF);
@@ -471,6 +485,7 @@ void main(void) {    // Disable Watchdog Timer while Initializing.
     P2IFG = 0;
     P4IFG = 0;
     while(1) {
+        display();
         stateCheck();
     }
 }
@@ -543,14 +558,16 @@ void Port_1(void) {
     SEL = 0;
     CURSOR = 0;
     SCREEN = TIME;
-    if (WATERING == 0) {
-        valveOpen();
-    } else if (WATERING == 1) {
-        valveClose();
+    if (MASTEROVERRIDE == 0) {
+        MASTEROVERRIDE = 1;
+        STATE = MASTERON;
+    } else if (MASTEROVERRIDE == 1) {
+        MASTEROVERRIDE = 0;
+        STATE = MASTEROFF;
     }
-    P1IFG = 0;
-    P1IE |= BIT5;
     __delay_cycles(100000);
+    P1IE |= BIT5;
+    P1IFG = 0;
 }
 
 #pragma vector = PORT2_VECTOR
@@ -700,7 +717,6 @@ void Port_2(void) {
             else if (SCREEN == MOIS) SCREEN = TIME;
         }
     } else if (P2IFG & BIT7) { // SELECT
-        P2IFG = 0;
         __no_operation();
         if (SEL == 1) SEL = 2;
         else if (SEL == 0) {
@@ -712,6 +728,7 @@ void Port_2(void) {
     __delay_cycles(100000);
     __no_operation();
     P2IE = BIT4|BIT5|BIT7;
+    P2IFG = 0;
 }
 
 #pragma vector = PORT4_VECTOR
@@ -721,13 +738,16 @@ __interrupt
  * The Interrupt Handler for Port 4
  */
 void Port_4(void) {
-    P4IFG = 0;
+    P4IE = 0;
     __delay_cycles(100000);
+    if (SCREEN == TIME) RTC_UPDATE();
     if (SEL != 0) {
         if (SEL == 1) CURSOR = 0;
         SEL--;
     }
     __delay_cycles(100000);
+    P4IE |= BIT7;
+    P4IFG = 0;
 }
 
 #pragma vector = RTC_VECTOR
@@ -737,29 +757,20 @@ __interrupt
 ** Interrupt handler for the RTC_C
 */
 void RTC_ISR(void) {
-    int count = 0;
-    switch(__even_in_range(RTCIV, 16)) {
-        case RTCIV_RTCTEVIFG:
         // Checks to make sure at least 2 hours between watering.
-            if (WATERED == 1) {
-                if (count == 1) {
-                    count = 0;
-                    WATERED = 0;
-                } else {
-                    count += 1;
-                }
-            } else if (WATERED == 0) {
-                count = 0;
-            }
-            RTC_UPDATE();
-            __bis_SR_register_on_exit(LPM3_bits);
-            break;
-        case RTCIV_RTCAIFG:
-        // Every half hour, polls the sensors, if haven't watered in last 2 hours.
-            if (WATERED == 0) STATE = POLLING;
-            if ((RTCAMIN & 0x3F) == 30) RTCAMIN = 60 | 0x80;
-            else RTCAMIN = 30 | 0x80;
-            __bis_SR_register_on_exit(LPM3_bits);
-            break;
+    if (WATERED == 1) {
+        if (count == 120) {
+            count = 0;
+            WATERED = 0;
+        } else {
+            count += 1;
+        }
+    } else if (WATERED == 0 && count == 30) {
+        STATE = POLLING;
+        count = 0;
     }
+    CURR_TIME.hourTen = RTCHOUR / 10;
+    CURR_TIME.hourOne = RTCHOUR % 10;
+    CURR_TIME.minTen = RTCMIN / 10;
+    CURR_TIME.minOne = RTCMIN % 10;
 }
