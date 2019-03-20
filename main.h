@@ -93,9 +93,10 @@ volatile unsigned int SEL = 0;
 // CURSOR=4 MOISTURE sensor toggle  (ON/OFF)
 unsigned int firstRun = 1;
 volatile unsigned int CURSOR = 0;
+volatile unsigned int firstPoll = 1;
 volatile state STATE = SLEEP;
 volatile screens SCREEN = TIME;
-#define MAXNODES 30
+#define MAXNODES 60
 volatile unsigned int MASTEROVERRIDE = 0;
 volatile unsigned int WATERED = 0;
 volatile unsigned int WATERING = 0;
@@ -111,5 +112,7 @@ volatile READ_RESULT CURR_TEMP_MOIST; // This holds average of sampling and valu
 volatile READ_RESULT USR_TEMP_MOIST; // Set this to the user's desired moisture and temperature
 RUN_RESULT PREV_RESULTS[MAXNODES]; //TODO Set this up for the deterministic algorithm
 volatile time CURR_TIME;
-volatile unsigned int count = 0;
+volatile unsigned int count = 0, pollCount = 1;
+volatile unsigned int valveOpenStart = 0, valveOpenTimer = 0, valveCloseStart = 0, valveCloseTimer = 0;
+volatile unsigned int adcTimer = 0, adcEnable = 0;
 #endif /* MAIN_H_ */
